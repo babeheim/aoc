@@ -1,11 +1,3 @@
----
-title: Advent of Code 2022
----
-
-
-bfs: 
-https://github.com/AdroMine/AdventOfCode/blob/main/2022/Day12/d12_solution.R
-https://github.com/sjmulder/aoc
 
 # [Day 13](https://adventofcode.com/2022/day/13)
 
