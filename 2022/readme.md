@@ -1,32 +1,153 @@
 
-# [Day 13](https://adventofcode.com/2022/day/13)
+
+
+
+# [Day 14: Regolith Reservoir](https://adventofcode.com/2022/day/14)
+
+Sand pours in grain-by-grain from point 500,0
+
+sand movement rules:
+- falls down one step if possible
+- if tile below is blocked, falls diagonally down and to the left
+- if that tile is blocked, falls diagonally down and to the right
+- if all three possible destinations are blocked, sand comes to a rest and no longer moves
+
+how many units of sand come to a rest, before sand falls into the abyss below? Part 2 seems to reference the idea there is no abyss at all....
+
+It seems like we need an efficient way to track a large matrix of values, e.g. 1000 x 500.
 
 ```R
 
-# [[],[[],10,6,8]]
+rm(list = ls())
 
-left <- fromJSON("[1,1,3,1,1]", simplifyVector = FALSE)
-right <- fromJSON("[1,1,5,1,1]", simplifyVector = FALSE)
+library(dplyr)
 
-left[1][[1]] >= right[1][[1]]
-left[2][[1]] >= right[2][[1]]
-left[3][[1]] >= right[3][[1]]
-left[4][[1]] >= right[4][[1]]
-left[5][[1]] >= right[5][[1]]
+viz_map <- function(map, grain = NULL, cell_size = 0.5) {
 
+  sand_col <- "#f9c83d"
+  grain_col <- "#fbd955"
+  rock_col <- "#988317"
 
-list(
-  list(),
-  list(
-    list(),
-    10,
-    6,
-    8
+  has_grain <- !is.null(grain)
+
+  rock_points <- which(map == "#", arr.ind = TRUE)
+  rocks <- data.frame(
+    x = rock_points[,2],
+    y = rock_points[,1],
+    type = "rock",
+    col = rock_col
   )
-)
+
+  has_sand <- any(map == "o")
+  if (has_sand) {
+    sand_points <- which(map == "o", arr.ind = TRUE)
+    sand <- data.frame(
+      x = sand_points[,2],
+      y = sand_points[,1],
+      type = "sand",
+      col = sand_col
+    )
+  }
+
+  par(bg = "black")
+  plot(NULL, xlim = c(500 - 50, 500 + 50), ylim = c(1, nrow(map)))
+  points(rocks, col = rock_col, pch = 15, cex = cell_size)
+  if (has_sand) points(sand, col = sand_col, pch = 15, cex = cell_size)
+  if (has_grain) points(grain, col = grain_col, pch = 15, cex = cell_size)
+
+}
+
+
+
+
+sim_grains <- function(path, viz = FALSE, overflow = FALSE) {
+
+  x <- readLines(path)
+
+  # add rocks to the map
+  rocks <- data.frame(x = integer(), y = integer())
+  for (i in seq_along(x)) {
+    coords <- strsplit(x[i], split = " -> ")[[1]]
+    for (j in 1:(length(coords) - 1)) {
+      x_start <- as.integer(substr(coords[j], 1, regexpr(",", coords[j]) - 1)) + 1L
+      y_start <- as.integer(substr(coords[j], regexpr(",", coords[j]) + 1, nchar(coords[j]))) + 1L
+      x_stop <- as.integer(substr(coords[j + 1], 1, regexpr(",", coords[j + 1]) - 1)) + 1L
+      y_stop <- as.integer(substr(coords[j + 1], regexpr(",", coords[j + 1]) + 1, nchar(coords[j + 1]))) + 1L
+      if (y_start != y_stop & x_start == x_stop) {
+        add <- data.frame(x = x_start, y = y_start:y_stop)
+        rocks <- bind_rows(rocks, add)
+      } else if (y_start == y_stop & x_start != x_stop) {
+        add <- data.frame(x = x_start:x_stop, y = y_start)
+        rocks <- bind_rows(rocks, add)
+      } else {
+        stop("invalid coordinates")
+      }
+    }
+  }
+
+  map_nrow <- max(rocks$y) + 2L
+
+  map <- matrix(".", nrow = map_nrow, ncol = 1300) # give a healthy width
+
+  # add a bottom line of bedrock
+  map[1,] <- "#"
+
+  # need to substract from nrow(map), so the map sees the top row as nrow(map) rather than 1
+  rocks$y <- map_nrow - rocks$y + 1L
+
+  for (i in 1:nrow(rocks)) map[rocks$y[i], rocks$x[i]] <- "#"
+
+  stopifnot(all(rocks$y > 0))
+  stopifnot(all(rocks$x > 0))
+
+  viz_map(map)
+
+  stop_condition <- FALSE
+
+  while (!stop_condition) {
+    grain <- data.frame(x = 501L, y = nrow(map))
+    if (map[nrow(map), 501L] == "o") stop_condition <- TRUE
+    while (!stop_condition & map[grain$y, grain$x] == ".") {
+      if (!overflow & grain$y == 2L) {
+        # only trigger if overflow set to FALSE
+        stop_condition <- TRUE
+      } else if (map[grain$y-1, grain$x] == ".") {
+        grain$y <- grain$y - 1
+      } else if (map[grain$y-1, grain$x-1] == ".") {
+        grain$y <- grain$y - 1
+        grain$x <- grain$x - 1
+      } else if (map[grain$y-1, grain$x+1] == ".") {
+        grain$y <- grain$y - 1
+        grain$x <- grain$x + 1
+      } else {
+        map[grain$y, grain$x] <- "o"
+      }
+      if (viz) {
+        viz_map(map, grain)
+        Sys.sleep(0.01)
+      }
+    }
+  }
+  viz_map(map, grain)
+  out <- sum(map == "o")
+  return(out)
+}
+
+sim_grains("day14/test_input.txt") == 24
+sim_grains("day14/input.txt") == 913
+
+sim_grains("day14/test_input.txt", overflow = TRUE) == 93
+sim_grains("day14/input.txt", overflow = TRUE) == 30762
+
+# I realized that both part 1 and part 2 can be solved by memoizing the path of each previous grain of sand and then starting at the last position before it landed rather than at (500,0). This worked quite nicely and sped up my solution about 20x.
 
 ```
 
+
+
+# [Day 13](https://adventofcode.com/2022/day/13)
+
+(solution is in my other repo!)
 
 
 # [Day 12: Hill Climbing Algorithm](https://adventofcode.com/2022/day/12)
