@@ -6,9 +6,7 @@
 
 
 
-# Day 8: Handheld Halting
-
-https://adventofcode.com/2020/day/8
+# [Day 8: Handheld Halting](https://adventofcode.com/2020/day/8)
 
 `acc` - increases or decreases the accumulator by the argument value (it initializes at 0), then executes next instruction
 `jmp` - jumps to next instruction relative to itself
@@ -119,9 +117,7 @@ stopifnot(find_halt("day08/input.txt", debug = TRUE) == 2001)
 
 
 
-# Day 7: Handy Haversacks
-
-https://adventofcode.com/2020/day/7
+# [Day 7: Handy Haversacks](https://adventofcode.com/2020/day/7)
 
 how many colors can eventually contain one shiny gold bag?
 
@@ -179,9 +175,7 @@ parse_rules <- function(path) {
 ```
 
 
-# Day 6: Custom Customs
-
-https://adventofcode.com/2020/day/6
+# [Day 6: Custom Customs](https://adventofcode.com/2020/day/6)
 
 ```r
 
@@ -223,9 +217,7 @@ count_letters("day06/input.txt", op = intersect) == 3354
 
 
 
-# Day 5: Binary Boarding
-
-https://adventofcode.com/2020/day/5
+# [Day 5: Binary Boarding](https://adventofcode.com/2020/day/5)
 
 For a given region, the next letter in the sequence (L or R, F or B) says which half of that region it is. 
 
@@ -287,9 +279,7 @@ find_empty_seat("day05/input.txt") == 515
 
 
 
-# Day 4: Passport Processing
-
-https://adventofcode.com/2020/day/4
+# [Day 4: Passport Processing](https://adventofcode.com/2020/day/4)
 
 ```r
 
@@ -368,9 +358,7 @@ count_valid_passports("day04/input.txt", strict = TRUE) == 160
 ```
 
 
-# Day 3: Toboggan Trajectory
-
-https://adventofcode.com/2020/day/3
+# [Day 3: Toboggan Trajectory](https://adventofcode.com/2020/day/3)
 
 Starting at (1,1), we need to locate every entry that is x cells over and y cells down from the previous position.
 
@@ -430,9 +418,7 @@ calc_tree_hits("day03/input.txt", slope_xs, slope_ys) == 2608962048
 ```
 
 
-# Day 2: Password Philosphy
-
-https://adventofcode.com/2020/day/2
+# [Day 2: Password Philosphy](https://adventofcode.com/2020/day/2)
 
 We're given pairs of strings. The first string is the *policy* and the second string is the *password*. A policy of `1-3 a` means the password must contain `a` at least `1` and at most `3` times.
 
@@ -490,9 +476,7 @@ sum_valid_passwords_part2("day02/input.txt") == 705
 
 
 
-# Day 1: Report Repair
-
-https://adventofcode.com/2020/day/1
+# [Day 1: Report Repair](https://adventofcode.com/2020/day/1)
 
 For a list of numbers, find the pair that sum to 2020. The solution is the product of these two numbers.
 

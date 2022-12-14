@@ -1,8 +1,8 @@
 
 My solutions for the [Advent of Code](https://adventofcode.com/) competition by [Eric Wastl](https://twitter.com/ericwastl), mostly written in R:
-- [2020](2020/readme.md)
-- [2021](2021/readme.md)
 - [2022](2022/readme.md)
+- [2021](2021/readme.md)
+- [2020](2020/readme.md)
 
 Note: Eric has asked people [not to publish the puzzle inputs](https://mobile.twitter.com/ericwastl/status/1465805354214830081), so I have removed them from this public repo (more [here](https://www.reddit.com/r/adventofcode/comments/zh2hk0/2022friendly_reminder_dont_commit_your_input/)).
 
