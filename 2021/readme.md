@@ -1,11 +1,6 @@
 
 # Solvers and Solutions
 
-- [Reddit Megathreads](https://www.reddit.com/r/adventofcode/wiki/solution_megathreads)
-- [Hvitfeldt's solutions](https://emilhvitfeldt.github.io/rstats-adventofcode/2021.html)
-- [Antoine Fabri's page](https://github.com/moodymudskipper/adventofcode2021)
-- [mebeim's page](https://github.com/mebeim/aoc/blob/master/2021/README.md)
-- [Sijmen J. Mulder's page](https://github.com/sjmulder/aoc)
 - Day 02 using [{R6} objects](https://github.com/karawoo/adventofcode2021/blob/main/R/day02.R#L98-L150)
 - Day 08 [animation](https://www.reddit.com/r/adventofcode/comments/rbuvq3/2021_day_8_part_2pygame_code_breaker/)
 - Day 09 [also using igraph](https://twitter.com/rappa753/status/1468876602016735233)
@@ -19,9 +14,7 @@
 
 
 
-# Day 25: Sea Cucumber
-
-https://adventofcode.com/2021/day/25
+# [Day 25: Sea Cucumber](https://adventofcode.com/2021/day/25)
 
 We have a grid of agents, some are "east-facing" and some are "south-facing", on a toroid. Each time step, the east-facing individuals each consider whether there's an open space in front of them and, if it's free, they all move. Then the south-facing individuals each consider whether there's an open space to the south and, if its free, they all move. It's a toroid, so those on the bottom of the map consider the top of the map as their next spot, and those on the far east consider the western-most spot their next spot. The goal is to find the first step on which no sea cucumbers move?
 
@@ -83,9 +76,7 @@ sim_cucumbers("day25/input.txt") == 563
 
 
 
-# Day 24: Arithmetic Logic Unit
-
-https://adventofcode.com/2021/day/24
+# [Day 24: Arithmetic Logic Unit](https://adventofcode.com/2021/day/24)
 
 ```r
 
@@ -365,9 +356,7 @@ stopifnot(z == 0)
 
 
 
-# Day 23: Amphipod
-
-https://adventofcode.com/2021/day/23
+# [Day 23: Amphipod](https://adventofcode.com/2021/day/23)
 
 A spatial puzzle! We have to instruct amphipods of four types of amphipod, A, B, C and D, into their corresponding room in a spatial map that looks like this:
 
@@ -568,9 +557,7 @@ score_shortest_path("day23/input_2.txt") == 47509
 
 
 
-# Day 22: Reactor Reboot
-
-https://adventofcode.com/2021/day/22
+# [Day 22: Reactor Reboot](https://adventofcode.com/2021/day/22)
 
 A 3-dimensional array, all 0s.
 apply a list of steps to them
@@ -825,9 +812,7 @@ calc_reactor_volume("day22/input.txt", init_stage = FALSE) == 1160011199157381
 
 
 
-# Day 21: Dirac Dice
-
-https://adventofcode.com/2021/day/21
+# [Day 21: Dirac Dice](https://adventofcode.com/2021/day/21)
 
 Dirac Dice is a two-player game that consists of a single die, two pawns (one for each player), and a game board with a circular track and ten marked spaces or position, 1 to 10, clockwise. Each player's starting place is chosen, and they take turns moving. On each player's turn, the player rolls the die three times, adds up the results (a value which depends on how many sides the die has!), and moves their pawn that many times around the track. The value of the space they land on is the number of points they get, added to a score that starts at 0. In both parts, our task is to figure out which player will win the game, at first in a deterministic system, then a stochatic one.
 
@@ -1006,9 +991,7 @@ res$p2_winners == 17242469745088
 
 
 
-# Day 20: Trench Map
-
-https://adventofcode.com/2021/day/20
+# [Day 20: Trench Map](https://adventofcode.com/2021/day/20)
 
 We're given an "image enhancement algorithm" (a bit string of 512 characters) and an "input image" (a bit map). Each input image pixel and the eight adjacent pixels in the grid are combined by concatenation to produce an index for the bit string, and the pixel stored at that index is the output pixel for this map.
 
@@ -1110,9 +1093,7 @@ the best i can do is add a buffer to 2 times the number of enhancements, then re
 
 
 
-# Day 19: Beacon Scanner
-
-https://adventofcode.com/2021/day/19
+# [Day 19: Beacon Scanner](https://adventofcode.com/2021/day/19)
 
 Scanners can detect any nearby beacons *relative* to their position, where nearby means <= 1000 m in x,y,z space. Scanners cannot detect other scanners and we do not know the absolute position of each scanner. Further, the scanners do not know their relative orientations either, except that they are pointed along an axis (so 24 different possible orientations)
 
@@ -1355,9 +1336,7 @@ max(manhatten) == 14804
 
 
 
-# Day 18: Snailfish
-
-https://adventofcode.com/2021/day/18
+# [Day 18: Snailfish](https://adventofcode.com/2021/day/18)
 
 The functions `split`, `split_tree` and `split_once` take care of everything split-related. The `count_tree` and `add_value` are both helper functoins for `explode_tree` which takes care of everything explode-related. Then the `add_snailfish` function wraps all those together, and the `calc_magnitude` produces the desired output!
 
@@ -1695,9 +1674,7 @@ calc_max_magnitude("day18/input.txt") == 4725
 
 
 
-# Day 17: Trick Shot
-
-https://adventofcode.com/2021/day/17
+# [Day 17: Trick Shot](https://adventofcode.com/2021/day/17)
 
 Here we're tasked with calculating a ballistic trajectory in two dimensions, trying to hit a rectangular target area. At each time step, our probe's x-position updates by its x-velocity at the previous timestep, so $x_{t+1} = x_t + v_t$, and its' y-position updates the same. The probe begins at coordinates 0,0 and its velocity in both dimensions decreases by one each timestep from the initial values. The x-velocity slows to 0 and stops (due to drag), but the y-velocity continues to decrement by 1 without end (due to gravity). The probe has successfully reached the target if its coordinates are within the target boundaries at the end of a discrete time step - speeding through the target to the other side doesn't count.
 
@@ -1971,9 +1948,7 @@ calc_least_cost_path("day15/input.txt", use_full = TRUE) == 2927 # 11 minutes
 
 
 
-# Day 14: Extended Polymerization
-
-https://adventofcode.com/2021/day/14
+# [Day 14: Extended Polymerization](https://adventofcode.com/2021/day/14)
 
 Here we want to know how many atoms will be involved in a polymer growth process. Start with a string like `NNCB` which represents four atoms in a chain, and apply insertion rules like `NC -> B`. This means, for a sequence of elements `N` and `C` we insert a `B` element in-between them. All insertions happen simultaneously, lengthening the polymer chain. The starting input is a chain of 20 atoms. Our target is to count up the most common and least common elements in the resulting polymer after 10 growth steps (in Part One) and afte 40 steps (in Part Two).
 
@@ -2055,9 +2030,7 @@ max(tab$n_after_40) - min(tab$n_after_40) == 2516901104210 # part 2 answer
 
 
 
-# Day 13: Transparent Origami
-
-https://adventofcode.com/2021/day/13
+# [Day 13: Transparent Origami](https://adventofcode.com/2021/day/13)
 
 Here, we have to "fold" a set of coordinates along specific axes, hopefully decoding a message.
 
@@ -2093,9 +2066,7 @@ nrow(fold_points("day13/input.txt", n_folds = 1)) == 689
 
 
 
-# Day 12: Passage Pathing
-
-https://adventofcode.com/2021/day/12
+# [Day 12: Passage Pathing](https://adventofcode.com/2021/day/12)
 
 Part One:
 
@@ -2172,9 +2143,7 @@ length(map_paths("day12/input.txt", once = FALSE)) == 98441
 
 
 
-# Day 11: Dumbo Octopus
-
-https://adventofcode.com/2021/day/11
+# [Day 11: Dumbo Octopus](https://adventofcode.com/2021/day/11)
 
 There are 100 octopuses arranged neatly in a 10 by 10 grid. Each octopus slowly gains energy over time and flashes brightly for a moment when its energy is full. 
 
@@ -2229,9 +2198,7 @@ min(which(n_flashes == 100)) == 256
 
 
 
-# Day 10: Syntax Scoring
-
-https://adventofcode.com/2021/day/10
+# [Day 10: Syntax Scoring](https://adventofcode.com/2021/day/10)
 
 Lines with correct syntax have nested opening and closing brackets that all match. A "corrupted" line opens on one left bracket (either `(`, `[`, `{`, or `<`) but closes on the wrong right bracket (either `)`, `]`, `}`, `>`). An "incomplete" line is not corrupted, but has un-matched right brackets.
 
@@ -2312,9 +2279,7 @@ median(d$patch_score, na.rm = TRUE) == 2165057169
 
 
 
-# Day 9: Smoke Basin
-
-https://adventofcode.com/2021/day/9
+# [Day 9: Smoke Basin](https://adventofcode.com/2021/day/9)
 
 Given a 2-dimensional matrix of digits, in Part One we are asked to find the local minimums, considering up-down and left-right differences only. In Part Two, we have to measure the size of the *basins* around each minimum, including all values except the 9s which represent the borders between basins, and multiply the sizes of the three largest basins. Initially I did an adjacency matrix approach using the {igraph} package, which works, but the simpler solution is just a `while` loop.
 
@@ -2397,9 +2362,7 @@ calc_basin_score("day09/input.txt") == 1103130
 
 
 
-# Day 8: Seven Segment Search
-
-https://adventofcode.com/2021/day/8
+# [Day 8: Seven Segment Search](https://adventofcode.com/2021/day/8)
 
 The seven segments of a seven-segment display are labelled `a` thru `g`, and can display any digit from 0 to 9:
 
@@ -2591,9 +2554,7 @@ decode_sum_targets("day08/input.txt") == 978171
 ```
 
 
-# Day 7: The Treachery of Whales
-
-https://adventofcode.com/2021/day/7
+# [Day 7: The Treachery of Whales](https://adventofcode.com/2021/day/7)
 
 In Part One, we want to find the (integer) value which minimizes the total absolute deviation of a list of integers representing fuel costs. In Part Two, we want to find the value to minimize the total *cumulative* absolute deviation (e.g. for a list entry 10 and a candidate value 5, there is an absolute deviation of 5 and a cumulative deviation of 1 + 2 + 3 + 4 + 5 = 15).
 
@@ -2650,9 +2611,7 @@ points(479, 96987919, pch = 20)
 ```
 
 
-# Day 6: Lanternfish
-
-https://adventofcode.com/2021/day/6
+# [Day 6: Lanternfish](https://adventofcode.com/2021/day/6)
 
 Here we model a population of exponentially-growing, immortal lanternfish. Each mature fish can be categorized in one of seven states, representing the number of days remaining until reproduction, from 6 to 0. At the end of day 0, the fish reproduces, and begins the next day in state 6 again along with its offspring. Offspring fish take two days to mature and begin the reproductive cycle in state 6, so we could call those immature states 8 and 7. Given an initial population of fish with known states, we want to project the population size forward using these unconstrained growth rules.
 
@@ -2794,9 +2753,7 @@ sim_lanternfish_v4("day06/input.txt", n_days = 256) == 1728611055389
 
 
 
-# Day 5: Hydrothermal Venture
-
-https://adventofcode.com/2021/day/5
+# [Day 5: Hydrothermal Venture](https://adventofcode.com/2021/day/5)
 
 We have the start- and stop-coordinates for lines of hydrothermal vents in discrete x-y space, in the format of
 
@@ -2887,9 +2844,7 @@ map_danger(dat$start, dat$stop, include_diag = TRUE) == 20898
 
 
 
-# Day 4: Giant Squid
-
-https://adventofcode.com/2021/day/4
+# [Day 4: Giant Squid](https://adventofcode.com/2021/day/4)
 
 For a given set of 5x5 bingo boards, find the board that will have the first "bingo" as you proceed through a given sequence of bingo draws. Also find the board that will have the *last* bingo through these draws, a guaranteed loser.
 
@@ -2969,9 +2924,7 @@ score_board(dat$board_array[,,92], dat$draws[1:83]) == 30070
 
 
 
-# Day 3: Binary Diagnostic
-
-https://adventofcode.com/2021/day/3
+# [Day 3: Binary Diagnostic](https://adventofcode.com/2021/day/3)
 
 Here we work with a list of binary numbers, all the same length. In Part One, we calculate two new numbers, `gamma` and `epsilon`. Each bit in `gamma` is the most-common bit in the corresponding position of the list. Each bit in `epsilon` is the least-common bit. For a given list, the product of gamma and epsilon is our target. In Part Two, we must find the unique number in the list (the "oxygen consumption score") that contains the most-common bit in the first position, in the second position, and so forth, and find the unique number in the list (the "CO2 scrubber score") that contains the least-common bit in the first position, in the second position, and so forth. Our target in Part Two is again the product of these two numbers.
 
@@ -3035,9 +2988,7 @@ calc_oxygen_co2("day03/input.txt") == 4432698
 
 
 
-# Day 2: Dive!
-
-https://adventofcode.com/2021/day/2
+# [Day 2: Dive!](https://adventofcode.com/2021/day/2)
 
 We calculate our horizonal and vertical position after applying a list of text commands. In Part One, the command `forward 8` just means add 8 to our horizonal displacement, `up 8` means a decrease in depth by 8, and `down 2` an increase in depth of 2. In Part Two, we modify this interpretation: now `up 8` means decrease a quantity called *aim* by 8, and `down 2` means increase aim by 2. When we apply a `forward` command, we increase our horizonal displacement by the number given, and change our vertical displacement by the horizonal change times the aim.
 
@@ -3111,9 +3062,7 @@ prod(vectors[nrow(vectors),1:2]) # 1855892637
 
 
 
-# Day 1: Sonar Sweep
-
-https://adventofcode.com/2021/day/1
+# [Day 1: Sonar Sweep](https://adventofcode.com/2021/day/1)
 
 For a list of measurements, how many are larger than the previous measurement in the list? For Part One, we are given the list of measurements. For Part Two, we construct the list from a longer list, as the rolling sum of every group of three measures.
 
