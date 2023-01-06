@@ -37,6 +37,5 @@ toc(log = TRUE)
 stopifnot(count_calories("day01/test_input.txt", n_elves = 3) == 45000)
 
 tic("Day 01, part 2")
-stopifnot(count_calories("day01/input.txt", n_elves 
-= 3) == 199628)
+stopifnot(count_calories("day01/input.txt", n_elves = 3) == 199628)
 toc(log = TRUE)
