@@ -2,7 +2,819 @@
 
 
 
+# [Day 25: Full of Hot Air](https://adventofcode.com/2022/day/25)
+
+- https://www.reddit.com/r/adventofcode/comments/zwqd2f/2022_day_25_part_1_4_working_approaches_to_day_25/
+
+Converted SNAFU inputs to decimals (aka denary numbers).
+
+Added denary numbers.
+
+Converted sum from denary to SNAFU using analytic expression.
+
+Mathematically, a denary number A plus some baseline (1111...1)_5 equals a number B in base 5 whose digits are all two plus the number in base SNAFU. The number of digits in the baseline is just the order of magnitude of A in base-5, i.e. the ceiling of the base-5 logarithm of A.
+
+
+
+# [Day 24: Blizzard Basin](https://adventofcode.com/2022/day/24)
+
+Each time step you can only stay put or move into adjacent open tiles, but each time step, the location of the open tiles changes (meaning, you might have no where to go!). So it's a search through a maze, but the maze is changing each time step, and some routes might become failures.
+
+The system is totally deterministic though, so we know what spots are open on what times; this is a multiverse system!
+
+Because we have a finite set of possible spaces to move to, my strategy was to use a (many-worlds) BFS approach. Specifically, for any given space we might occupy in the current time step, we identify what spaces will be available in the next time step, and do so for every space that is reachable in the current time step. Then, we recursively iterate over those candidate spaces in the same fashion. In practice, we thus explore every possible next space until one of them is the desired destination, and we are done.
+
+- online discussion recommends viewing the system in three dimensions (the third being time), then its just a 3D maze
+
+
+
+# [Day 23: Unstable Diffusion](https://adventofcode.com/2022/day/23)
+
+- [solution megathread](https://www.reddit.com/r/adventofcode/comments/zt6xz5/2022_day_23_solutions/)
+- using a finite state machine approach? Maybe the [{datafsm}](https://jonathan-g.github.io/datafsm/) package
+- [Great viz, coloration is time since last moement](https://www.reddit.com/r/adventofcode/comments/ztb52g/2022_day_23_part2_python_coloured_by_time_since/)
+
+Movement rules for each elf:
+- if no other elf is in any of the eight adjacent tiles, the focal elf does not move (they are antisocial)
+- if another elf is nearby, the focal elf looks  sequentially in four directions and proposes movement if that tile, and the two adjacent tiles visible to the elf, are unoccupied (so, North if North, Northwest, and Northeast are all clear). They stop looking once they've made a proposal.
+- After all proposals made, elves move IF they were the only ones to propose that spot (otherwise they stay put)
+
+All elves have the same sequence of proposal directions each round, but between rounds, this sequence cycles down one.
+
+My strategy is to keep track of the elves as a list of agents, with a row and column on a fixed grid, and a 'proposal' position. To make this work I am converting between the row-column notation and the linear index notation for a matrix. It's easy to identify conflicts via duplicated proposal positions.
+
+But, as the cloud of elves expands, I encounter problems when they exceed the capacity of the matrix, so I am throwing a 'buffer' around the matrix. This is which is honestly unsatisfying, since I didn't know ahead of time whether the buffer was big enough, and I had to keep increasing it to prevent the simulation from crashing.
+
+Another approach might be to track the x-y position not using a linear index or a matrix at all. This would have the advantage of being infinitely expandable.
+
+[-] on day 23, rewrite the code so there is not 'map' matrix with rows and columns, and the elves store just x and y positions instead
+
+
+
+
+# [Day 22: Monkey Map](https://adventofcode.com/2022/day/22)
+
+Another spatial puzzle; given a starting place on a landscape, we follow instructions to move X steps or turn to the right or left 90 degrees. If we encounter obstacles we prematurely halt that specific movement, but otherwise just follow the instructions.
+
+Part 1 treats the landscape as a torus, wrapping around each side. This is easy enough to program, but in part 2, we have a more complex topology - a cube map, with the six sides of the cube unfolded.
+
+Any specific cube face is connected to four other cube faces, but in bespoke ways.
+
+One way to describe the map is to create hard-wired boundaries. But I'd like to 
+
+Ok, I think I got it. We need to be able to describe a cube of arbitrary size, then apply the input picture as a 'texture' on top of that cube.
+
+The fundamental question of this problem is, how do you represent movement on the surface of a cube? My strategy: for side length n, an nxnx6 array. Each face has cardinal directions. When movement is *across* faces.
+
+```R
+
+rm(list = ls())
+
+library(dplyr)
+
+
+# what does a rotation do? when you provide a specific x and y on the face, the rotation causes the face to rotate! 
+
+rotate_matrix_cw <- function(mat, n_times = 0) {
+  n_times <- n_times %% 4
+  if (n_times == 0) {
+    out <- mat
+  } else if (n_times == 1) {
+    out <- t(mat)[,ncol(mat):1]
+  } else if (n_times == 2) {
+    # aka -2
+    out <- t(mat)[,ncol(mat):1]
+    out <- t(out)[,ncol(out):1]
+  } else if (n_times == 3) {
+    # aka -1
+    out <- t(mat)[nrow(mat):1,]
+  } else {
+    stop("n_times invalid")
+  }
+  return(out)
+}
+
+rotate_position <- function(pos, n_side, rotation) {
+  map <- matrix(1:(n_side^2), ncol = n_side)
+  position_index <- map[pos$row, pos$col]
+  map <- rotate_matrix_cw(map, n_times = rotation)
+  new_position <- which(map == position_index, arr.ind = TRUE)
+  out <- pos
+  out$row <- as.integer(new_position[,"row"])
+  out$col <- as.integer(new_position[,"col"])
+  out$orientation <- as.integer((pos$orientation + rotation) %% 4)
+  return(out)
+}
+
+move_once <- function(current_state, edges, terrain) {
+
+  n_side <- dim(terrain)[1]
+
+  if (current_state$orientation == 0L) {
+    move <- list(row = 0L, col = 1L)
+  } else if (current_state$orientation == 1L) {
+    move <- list(row = 1L, col = 0L)
+  } else if (current_state$orientation == 2L) {
+    move <- list(row = 0L, col = -1L)
+  } else if (current_state$orientation == 3L) {
+    move <- list(row = -1L, col = 0L)
+  } else {
+    stop("orientation invalid")
+  }
+
+  next_state <- current_state
+  next_state$row <- current_state$row + move$row
+  next_state$col <- current_state$col + move$col
+
+  if (next_state$col == 0L) {
+    tar <- which(next_state$face == edges$from & edges$dir == "W")
+    next_state$face <- edges$to[tar]
+    next_state$col <- n_side
+    next_state <- rotate_position(next_state, n_side, edges$rotation[tar])
+  } else if (next_state$col == (n_side + 1L)) {
+    tar <- which(next_state$face == edges$from & edges$dir == "E")
+    next_state$face <- edges$to[tar]
+    next_state$col <- 1L
+    next_state <- rotate_position(next_state, n_side, edges$rotation[tar])
+  } else if (next_state$row == 0L) {
+    tar <- which(next_state$face == edges$from & edges$dir == "N")
+    next_state$face <- edges$to[tar]
+    next_state$row <- n_side
+    next_state <- rotate_position(next_state, n_side, edges$rotation[tar])
+  } else if (next_state$row == (n_side + 1L)) {
+    tar <- which(next_state$face == edges$from & edges$dir == "S")
+    next_state$face <- edges$to[tar]
+    next_state$row <- 1L
+    next_state <- rotate_position(next_state, n_side, edges$rotation[tar])
+  }
+
+  # having identified the proposed state, check whether it is blocked on the terrain map
+
+  if (terrain[next_state$row, next_state$col, next_state$face] == 0L) {
+    return(next_state)
+  } else {
+    return(current_state)
+  }
+
+}
+
+
+
+# describing a cross-shaped cube net (not applicable to actual puzzle)
+edges <- list(
+  list(from = 1, to = 2, dir = "N", rotation = 0),
+  list(from = 1, to = 4, dir = "S", rotation = 0),
+  list(from = 1, to = 6, dir = "E", rotation = 0),
+  list(from = 1, to = 5, dir = "W", rotation = 0),
+
+  list(from = 2, to = 3, dir = "N", rotation = 0),
+  list(from = 2, to = 1, dir = "S", rotation = 0),
+  list(from = 2, to = 6, dir = "E", rotation = 1),
+  list(from = 2, to = 5, dir = "W", rotation = -1),
+
+  list(from = 3, to = 4, dir = "N", rotation = 0),
+  list(from = 3, to = 2, dir = "S", rotation = 0),
+  list(from = 3, to = 6, dir = "E", rotation = 2),
+  list(from = 3, to = 5, dir = "W", rotation = 2),
+
+  list(from = 4, to = 1, dir = "N", rotation = 0),
+  list(from = 4, to = 3, dir = "S", rotation = 0),
+  list(from = 4, to = 6, dir = "E", rotation = -1),
+  list(from = 4, to = 5, dir = "W", rotation = 1),
+
+  list(from = 5, to = 2, dir = "N", rotation = 1),
+  list(from = 5, to = 4, dir = "S", rotation = -1),
+  list(from = 5, to = 1, dir = "E", rotation = 0),
+  list(from = 5, to = 3, dir = "W", rotation = 2),
+  
+  list(from = 6, to = 2, dir = "N", rotation = -1),
+  list(from = 6, to = 4, dir = "S", rotation = 1),
+  list(from = 6, to = 3, dir = "E", rotation = 2),
+  list(from = 6, to = 1, dir = "W", rotation = 0)
+) |> bind_rows() |> as.data.frame()
+
+edges$rotation <- as.integer(edges$rotation)
+edges$from <- as.integer(edges$from)
+edges$to <- as.integer(edges$to)
+
+
+# going west
+
+n_side <- 10L
+terrain <- array(0, dim = c(n_side, n_side, 6))
+state <- list(row = 3L, col = 2L, face = 1L, orientation = 2L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 3L, col = 1L, face = 1L, orientation = 2L)))
+
+state <- list(row = 4L, col = 2L, face = 1L, orientation = 2L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 4L, col = 1L, face = 1L, orientation = 2L)))
+
+state <- list(row = 10L, col = 10L, face = 1L, orientation = 2L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 10L, col = 9L, face = 1L, orientation = 2L)))
+
+state <- list(row = 1L, col = 2L, face = 1L, orientation = 2L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 1L, col = 1L, face = 1L, orientation = 2L)))
+
+state <- list(row = 1L, col = 2L, face = 1L, orientation = 2L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 1L, col = 1L, face = 1L, orientation = 2L)))
+
+state <- list(row = 1L, col = 2L, face = 2L, orientation = 2L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 1L, col = 1L, face = 2L, orientation = 2L)))
+
+state <- list(row = 1L, col = 1L, face = 1L, orientation = 2L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 1L, col = n_side, face = 5L, orientation = 2L)))
+
+state <- list(row = 10L, col = 1L, face = 1L, orientation = 2L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 10L, col = n_side, face = 5L, orientation = 2L)))
+
+# going east
+
+state <- list(row = 10L, col = 9L, face = 1L, orientation = 0L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 10L, col = 10L, face = 1L, orientation = 0L)))
+
+state <- list(row = 10L, col = 10L, face = 1L, orientation = 0L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 10L, col = 1L, face = 6L, orientation = 0L)))
+
+state <- list(row = 4L, col = 10L, face = 1L, orientation = 0L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 4L, col = 1L, face = 6L, orientation = 0L)))
+
+# going north
+
+state <- list(row = 2L, col = 1L, face = 1L, orientation = 3L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 1L, col = 1L, face = 1L, orientation = 3L)))
+
+state <- list(row = 1L, col = 1L, face = 1L, orientation = 3L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = n_side, col = 1L, face = 2L, orientation = 3L)))
+
+# going south
+
+state <- list(row = n_side, col = n_side, face = 1L, orientation = 1L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 1L, col = n_side, face = 4L, orientation = 1L)))
+
+state <- list(row = 9L, col = n_side, face = 1L, orientation = 1L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 10L, col = n_side, face = 1L, orientation = 1L)))
+
+# harder problems....
+
+state <- list(row = 1L, col = 3L, face = 5L, orientation = 3L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 3L, col = 1L, face = 2L, orientation = 0L)))
+
+state <- list(row = 6L, col = n_side, face = 6L, orientation = 0L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 5L, col = n_side, face = 3L, orientation = 2L)))
+
+state <- list(row = 1L, col = 3L, face = 6L, orientation = 3L)
+stopifnot(identical(move_once(state, edges, terrain), list(row = 8L, col = n_side, face = 2L, orientation = 2L)))
+
+```
+
+Ok, except for the terrain mapping function, I've got everything I need to execute instructions!
+
+```R
+
+sim_movement2 <- function(path, verbose = FALSE) {
+
+#  path <- "day22/input.txt"
+  x <- readLines(path)
+
+  # describing a cube net for part 2
+  edges <- list(
+    list(from = 1, to = 2, dir = "N", rotation = 2),
+    list(from = 1, to = 4, dir = "S", rotation = 0),
+    list(from = 1, to = 6, dir = "E", rotation = 1),
+    list(from = 1, to = 3, dir = "W", rotation = -1),
+
+    list(from = 2, to = 1, dir = "N", rotation = 2),
+    list(from = 2, to = 5, dir = "S", rotation = 2),
+    list(from = 2, to = 3, dir = "E", rotation = 0),
+    list(from = 2, to = 6, dir = "W", rotation = 0),
+
+    list(from = 3, to = 1, dir = "N", rotation = 1),
+    list(from = 3, to = 5, dir = "S", rotation = -1),
+    list(from = 3, to = 4, dir = "E", rotation = 0),
+    list(from = 3, to = 2, dir = "W", rotation = 0),
+
+    list(from = 4, to = 1, dir = "N", rotation = 0),
+    list(from = 4, to = 5, dir = "S", rotation = 0),
+    list(from = 4, to = 6, dir = "E", rotation = 0),
+    list(from = 4, to = 3, dir = "W", rotation = 0),
+
+    list(from = 5, to = 4, dir = "N", rotation = 0),
+    list(from = 5, to = 2, dir = "S", rotation = 2),
+    list(from = 5, to = 6, dir = "E", rotation = -1),
+    list(from = 5, to = 3, dir = "W", rotation = 1),
+    
+    list(from = 6, to = 1, dir = "N", rotation = -1),
+    list(from = 6, to = 5, dir = "S", rotation = 1),
+    list(from = 6, to = 2, dir = "E", rotation = 0),
+    list(from = 6, to = 4, dir = "W", rotation = 0)
+  ) |> bind_rows() |> as.data.frame()
+
+  if (path == "day22/test_input.txt") {
+    brd_map <- list(
+      list(face = 1, rows_before = 0, cols_before = 2, rotation = 0),
+      list(face = 2, rows_before = 1, cols_before = 0, rotation = 0),
+      list(face = 3, rows_before = 1, cols_before = 1, rotation = 0),
+      list(face = 4, rows_before = 1, cols_before = 2, rotation = 0),
+      list(face = 5, rows_before = 2, cols_before = 2, rotation = 0),
+      list(face = 6, rows_before = 2, cols_before = 3, rotation = -1)
+    ) |> bind_rows() |> as.data.frame()
+  } else if (path == "day22/input.txt") {
+    brd_map <- list(
+      list(face = 1, rows_before = 0, cols_before = 1, rotation = 0),
+      list(face = 2, rows_before = 3, cols_before = 0, rotation = 1),
+      list(face = 3, rows_before = 2, cols_before = 0, rotation = 1),
+      list(face = 4, rows_before = 1, cols_before = 1, rotation = 0),
+      list(face = 5, rows_before = 2, cols_before = 1, rotation = 0),
+      list(face = 6, rows_before = 0, cols_before = 2, rotation = 1)
+    ) |> bind_rows() |> as.data.frame()
+  } else {
+    stop("invalid path")
+  }
+
+  edges$rotation <- as.integer(edges$rotation)
+  edges$from <- as.integer(edges$from)
+  edges$to <- as.integer(edges$to)
+
+  # load board
+  board_lines <- x[1:(which(x == "") - 1)]
+  brd <- matrix(NA, nrow = length(board_lines), ncol = max(nchar(board_lines)))
+  for (i in 1:length(board_lines)) {
+    chars <- strsplit(board_lines[i], split = "")[[1]]
+    for (j in 1:length(chars)) {
+      if (chars[j] == ".") {
+        brd[i, j] <- 0L
+      } else if (chars[j] == "#") {
+        brd[i, j] <- 1L
+      }
+    }
+  }
+
+  n_side <- min(dim(brd)) / 3 
+
+  viz <- FALSE
+  if (viz == TRUE) {
+    par(bg = "black")
+    plot(NULL, xlim = c(1, ncol(brd)), ylim = c(nrow(brd), 1))
+    for (i in 1:nrow(brd)) {
+      for (j in 1:ncol(brd)) {
+        if (!is.na(brd[i,j])) {
+          if (brd[i,j]) {
+            cell_col <- "#00d9ff"
+          } else {
+            cell_col <- "#0051ff"
+          }
+          rect(j - 0.5, i - 0.5, j + 0.5, i + 0.5, col = cell_col, border = NA)
+        }
+      }
+    }
+    for (i in 1:nrow(brd_map)) {
+      rect(brd_map$cols_before[i] * n_side + 1, brd_map$rows_before[i] * n_side + 1, brd_map$cols_before[i] * n_side + n_side, brd_map$rows_before[i] * n_side + n_side, col = "red")
+      text(
+        brd_map$cols_before[i] * n_side + (n_side + 1)/2,
+        brd_map$rows_before[i] * n_side + (n_side + 1)/2,
+        labels = i,
+        srt = 90 * brd_map$rotation[i]
+      )
+    }
+  }
+
+  # map the real terrain from the brd object
+ 
+  terrain <- array(NA, dim = c(n_side, n_side, 6))
+
+  for (i in 1:6) {
+    rs <- brd_map$rows_before[i] * n_side + 1
+    cs <- brd_map$cols_before[i] * n_side + 1
+    terrain[,,i] <- rotate_matrix_cw(brd[rs:(rs+(n_side-1)),cs:(cs+(n_side-1))], brd_map$rotation[i])
+  }
+
+  mv_string <- x[length(x)]
+  mv_string <- gsub("\\s", "", mv_string)
+  mv_string <- gsub("R", ",R,", mv_string)
+  mv_string <- gsub("L", ",L,", mv_string)
+  mv_string <- gsub(",+", ",", mv_string)
+  instructions <- strsplit(mv_string, split = ",")[[1]]
+  n_instructions <- length(instructions)
+
+  # initial state: You begin the path in the leftmost open tile of the top row of tiles. Initially, you are facing to the right (from the perspective of how the map is drawn).
+  state <- list(row = 1L, col = 1L, face = 1L, orientation = 0L)
+
+  for (i in seq_len(n_instructions)) {
+    if (instructions[i] == "L") {
+      state$orientation <- as.integer((state$orientation - 1L) %% 4)
+      if (verbose) cat("turned left\n")
+    } else if (instructions[i] == "R") {
+      state$orientation <- as.integer((state$orientation + 1L) %% 4)
+      if (verbose) cat("turned right\n")
+    } else {
+      n_moves <- as.integer(instructions[i])
+      for (j in seq_len(n_moves)) {
+        last_row <- state$row
+        last_col <- state$col
+        last_face <- state$face
+        state <- move_once(state, edges, terrain)
+        if (state$row == last_row & state$col == last_col & state$face == last_face) {
+          if (verbose) cat("moved", (j-1), "steps; hit barrier\n")
+          break()
+        }
+        if (j == n_moves) {
+          if (verbose) cat("moved", j, "steps\n")
+        }
+      }
+    }
+  }
+
+  # translate everything back to the board coordinate system, including orientation!
+  brd_state <- rotate_position(state, n_side, (-1) * brd_map$rotation[state$face])
+  brd_row <- brd_map$rows_before[brd_state$face] * n_side + brd_state$row
+  brd_col <- brd_map$cols_before[brd_state$face] * n_side + brd_state$col
+
+  out <- brd_row * 1000 +
+    brd_col * 4 +
+    brd_state$orientation
+
+  return(out)
+
+}
+
+stopifnot(sim_movement2("day22/test_input.txt") == 5031)
+stopifnot(sim_movement2("day22/input.txt") == 145065)
+
+```
+
+
+
+
+# [Day 21: Monkey Math](https://adventofcode.com/2022/day/21)
+
+
+root is doing an equality test, e.g. == not +
+humn is now a parameter, not the value in the code. our goal is to figure out what goes in to produce an equality check
+
+
+i solved by brute force extrapolation - look at the trend and see when the two input functions come closest together...iterative refinement and we got it
+it would be nice if there was something more systematic, however...
+
+
+```R
+
+# scratch:
+rm(list = ls())
+eval(parse(text = "zed <- function() foo() + out()"))
+eval(parse(text = "foo <- function() 1"))
+eval(parse(text = "bar <- function() 2"))
+eval(parse(text = "out <- function() foo() + bar()"))
+zed()
+
+```
+
+People online refer to gradient descent, newton-raphson
+
+
+# [Day 20: Grove Positioning System](https://adventofcode.com/2022/day/20)
+
+The number moves forwards or backwards in the list the number of spots its value indicates, when it is its turn to go.
+
+
+
+# [Day 19: Not Enough Minerals](https://adventofcode.com/2022/day/19)
+
+look at this post: https://www.reddit.com/r/adventofcode/comments/zxkrl8/2022_day_16_part_1_so_its_time_for_me_to_learn/
+
+robot factor takes 1 minute to make a robot, plus the necessary resrcs
+each robot collects 1 unit of its resource type per minute
+
+ore-collecting robots
+clay-collecting robots
+obsidian-collecting robots (uses clay)
+geode-collecting robots (uses obsidian)
+
+you start with one ore-collceting robot
+
+all robots need ore
+
+for a list of blueprints, figure out which one will maximize the number of geodes processed in 24 minutes 
+
+so the tricky part is that the blueprints arent deterministic...you have multpile allocation plans with each blueprint! i dunno how you can program a simple game to do that...
+
+This is a lot like Starcraft, which I have always wanted to understand in a mathematical sense...
+
+quotes from the megathread of solutions:
+
+" a bruteforce BFS,"
+
+> The following two observations *are* provably correct, and enough for both parts of the problem:
+> - if you already are producing more ore per minute than the ore cost of the most expensive robot, there is no benefit to purchasing additional ore robots. Likewise for clay and obsidian;
+> - there is no benefit to waiting a turn to buy a robot if you could buy it immediately [bret: and its a robot you definitely SHOULD buy]. Therefore, if you choose not to buy anything, the next robot you buy must be one of the robots you *couldn't* already afford that turn [and a robot definitely need].
+>   The above leads to a brute-force BFS whose states are (1) the amount of each ore you have, (2) the amount of each robot, (3) the current time, and (4) a bitmask of which robots you're allowed to purchase next.
+
+more insights: https://www.reddit.com/r/adventofcode/comments/zpy5rm/2022_day_19_what_are_your_insights_and/
+
+> Note that we can do a bit better: For any resource R that's not geode: if you already have X robots creating resource R, a current stock of Y for that resource, T minutes left, and no robot requires more than Z of resource R to build, and X * T+Y >= T * Z, then you never need to build another robot mining R anymore.
+
+in particular: https://www.reddit.com/r/adventofcode/comments/zpy5rm/comment/j0v9g8t/?utm_source=share&utm_medium=web2x&context=3
+
+> 4) Assume a utopistic scenario that you can produce a new Geode robot  (for free) every turn from now on starting at the current search state.  How much geode would that yield for you at the end? If it would yield  less than the absolute best amount of geode you have seen throughout the  search so far (this is why DFS search is good, it hits many terminal  nodes early), then you can cut the current search state off, as it can  never beat the current one. The effect of this was surprisingly good.
+
+The key insights:
+1. jump forwads to each decision point rather than step by step
+2. prune using a simple rule, the theoretical upper limit vs your current running maximum
+3. prune using the rule you shouldnt make more robots than the maximum needed for a given time period
+
+
+
+# [Day 18: Boiling Boulders](https://adventofcode.com/2022/day/18)
+
+We have an x-y-z coordinate for each voxel in a big blob. Our goal is to calculate the outside surface area (all sides that are not directly touching another voxel).
+
+```R
+
+rm(list = ls())
+
+calc_surface_area <- function(path) {
+  x <- readLines(path)
+  dat <- matrix(NA, nrow = length(x), ncol = 3)
+  for (i in 1:nrow(dat)) dat[i,] <- as.integer(strsplit(x[i], split = ",")[[1]])
+
+  # reindex at 1
+  dat[,1] <- dat[,1] - min(dat[,1]) + 1L
+  dat[,2] <- dat[,2] - min(dat[,2]) + 1L
+  dat[,3] <- dat[,3] - min(dat[,3]) + 1L
+
+  # enclose array in a box of 0's
+  n_x <- max(dat[,1]) + 2L
+  n_y <- max(dat[,2]) + 2L
+  n_z <- max(dat[,3]) + 2L
+  dat[,1] <- dat[,1] + 1L
+  dat[,2] <- dat[,2] + 1L
+  dat[,3] <- dat[,3] + 1L
+
+  ar <- array(0L, dim = c(n_x, n_y, n_z))
+
+  for (i in 1:nrow(dat)) {
+    ar[dat[i,1], dat[i,2], dat[i,3]] <- 1L
+  }
+
+  n_faces <- 0L
+
+  for (i in 1:dim(ar)[1]) {
+    for (j in 1:dim(ar)[2]) {
+      n_faces <- n_faces + sum(diff(c(0, ar[i,j,], 0)) != 0)
+    }
+  }
+
+  for (i in 1:dim(ar)[1]) {
+    for (j in 1:dim(ar)[3]) {
+      n_faces <- n_faces + sum(diff(c(0, ar[i,,j], 0)) != 0)
+    }
+  }
+
+  for (i in 1:dim(ar)[2]) {
+    for (j in 1:dim(ar)[3]) {
+      n_faces <- n_faces + sum(diff(c(0, ar[,i,j], 0)) != 0)
+    }
+  }
+
+  return(n_faces)
+
+}
+
+calc_surface_area("day18/test_input.txt") == 64
+calc_surface_area("day18/test_input_ii.txt") == 10
+calc_surface_area("day18/test_input_iii.txt") == 4332
+
+calc_surface_area("day18/input.txt") == 4364
+
+
+```
+
+This seems relatively straightforwards. Going along a specific column or row or whatever, we simply have to ask whether we transition from empty to occupied +1, occupied to empty +1. Empty to empty is +0 and full full is +0. 
+
+Part 2 is harder, because we are asked to count only the OUTSIDE surfaces. My approach in part 1 wont work at all, so we need to use a tree search algorithm!
+
+How about a 'minesweeper' approac? for each air cell, we ask how many lava cells are nearby and store those in an array. it's easy enough to incorporate part 2, smply by asking whether the air cell can be reached by a tree search from the outside
+
+
+
+# [Day 17: Pyroclastic Flow](https://adventofcode.com/2022/day/17)
+
+It's like tetris!
+
+-
++
+J
+I
+o
+
+how tall will the twoer get after 2022 rocks fall?
+
+- chamber is exactly 7 units wide
+- rock appears so left edge is 2 units from left wall, bottom edge is 3 units above highest rock in the room (or the floor)
+- jet, fall, jet, fall, etc.
+- the instant it touches a rock below it stops moving and the next rock appears and takes the next move in the move sequence
+
+strategy:
+- define a CONTROL POINT as the location of the bottom-left edge of the shape. this is within the piece except for the + piece
+- we track the control point for each object in the simulation
+- and once it is settled we move to the next object
+
+i am not describngn the sequence of events perfectly...
+
+1. push
+2. fall
+3. push
+4. fall 
+5. push
+6. fall
+7. push
+8. comes to a rest
+
+1. psuh
+2. fall
+3. push
+4. fall
+5. push
+6. fall
+7. push
+8. comes to a rest
+
+so fall first, then do a comes-to-a-rest check
+if not, apply the push and loop
+
+
+```R
+
+rm(list = ls())
+
+# sim_tetris("day17/test_input.txt", n_pieces = 1000000)
+222 * (1000000000000 / 1000000) / 3600 / 24 / 365 # 7 years!
+
+# We have to record the heights and pieces and figure out the pattern....
+
+
+record_tetris <- function(path, n_pieces = 2022) {
+
+  out <- rep(NA, n_pieces)
+
+  jet_sequence <- strsplit(readLines(path), split = "")[[1]]
+  jet_sequence <- ifelse(jet_sequence == ">", 1L, -1L)
+
+  jet_seqlen <- length(jet_sequence)
+
+  piece_list <- c("—", "+", "J", "I", "O")
+
+  # inital parameter values
+  arena_floor <- 0L # initalize this at 0 for scrolling
+  current_floor <- 1L # start at level 1 for the floor
+  jet_pointer <- 1L
+  pieces_dropped <- 0L
+
+  # initialize the arena
+  ar <- matrix(0L, ncol = 7, nrow = 100)
+  ar[current_floor,] <- 1L
+
+  while (pieces_dropped < n_pieces) {
+
+    current_piece <- piece_list[pieces_dropped %% 5L + 1L]
+
+    # define the new spawn point
+    sp_y <- current_floor + 4L - arena_floor # 3 empty lines separate
+    sp_x <- 3L
+
+    # spawn a piece
+    piece_mat <- spawn_piece(current_piece)
+    # locate in the arena
+    piece_mat[, 1] <- piece_mat[, 1] + sp_x
+    piece_mat[, 2] <- piece_mat[, 2] + sp_y
+
+    falling <- TRUE
+    hit_detected <- FALSE
+
+    while (falling) {
+
+      stopifnot(piece_mat[,1] <= 7L)
+      stopifnot(piece_mat[,1] >= 1L)
+
+      # apply the next push in the jet_sequence
+      candidate_piece_mat <- piece_mat
+      candidate_piece_mat[,1] <- candidate_piece_mat[,1] + jet_sequence[jet_pointer]
+
+      hit <- check_collision(candidate_piece_mat, ar)
+      if (!any(hit)) piece_mat <- candidate_piece_mat
+      jet_pointer <- jet_pointer + 1L
+      if (jet_pointer == (jet_seqlen + 1L)) jet_pointer <- 1L
+
+      # vertical collision check
+      candidate_piece_mat <- piece_mat
+      candidate_piece_mat[,2] <- candidate_piece_mat[,2] - 1L
+      hit <- check_collision(candidate_piece_mat, ar)
+      if (!any(hit)) {
+        piece_mat <- candidate_piece_mat
+      } else {
+        falling <- FALSE
+        for (i in 1:nrow(piece_mat)) {
+          ar[piece_mat[i,2], piece_mat[i,1]] <- 1L
+        }
+        current_floor <- max(which(apply(ar == 1, 1, any))) + arena_floor
+        out[pieces_dropped + 1] <- current_floor
+      }
+
+    }
+
+    pieces_dropped <- pieces_dropped + 1L
+    if (pieces_dropped %% 1000 == 0) cat(pieces_dropped, "\n")
+    
+    if ((nrow(ar) - (current_floor - arena_floor)) < 10) {
+#     cat("approaching end of arena\n")
+      ar <- rbind(ar[51:nrow(ar),], matrix(0L, nrow = 50, ncol = 7))
+      arena_floor <- arena_floor + 50L
+    }
+
+  }
+ 
+  return(out)
+
+}
+
+levels <- record_tetris("day17/input.txt", n_pieces = 100000)
+pieces <- 1:length(levels)
+
+levels <- c(1, levels)
+pieces <- c(0, pieces)
+
+fit <- lm(levels ~ pieces)
+res <- resid(fit)
+plot(levels, res, type = "l")
+# got it!
+
+# it cycles according to the length of the sequences
+# ~ 2626
+
+# try to find the optimal autocorrelation lag in the residuals...
+
+lags <- seq(1, 5000, by = 1)
+rho <- rep(NA, length(lags))
+i <- 15000
+for (j in 1:length(lags)) rho[j] <- cor(res[i + 1:1000], res[i + 1:1000 - lags[j]])
+lags[which(rho > 0.999)]
+# bingo! perfect cycle is 1715
+
+(res[20000 + 1:1715] - res[20000 + 1 * 1715 + 1:1715])[1]
+# every cylce adds a small change: 0.003876718
+
+1000000000000 %% 1715 
+# 583090379 cycles, residual 15
+
+# the first 100 or so moves dont really follow a pattern but then it starts following a regular cycle that loops every 1715 pieces
+plot(levels[1 * 1715 + 1:1715] - levels[0 * 1715 + 1:1715])
+abline(h = 0, lty = 2)
+
+# a mathematical model of the cycling behavior:
+pred_level <- function(x) {
+  n_cycles <- (x %/% 1715)
+  rem <- x %% 1715
+  levels[1 * 1715 + rem] + 2616 * (n_cycles - 1)
+}
+# exact recovery!!
+all(pred_level(100:100000) == levels[100:100000])
+
+options(scipen = 999)
+# 1525364431486 (too low!)
+# 1525364431487 <- just right!
+# 1525364431488 (too high!)
+
+x <- resid(lm(levels ~ pieces))
+
+i <- sample(1:length(x), 1)
+plot(x - x[i], type = "l", xlim = c(1500, 2000))
+abline(h = 0, lty = 2)
+
+
+```
+
+visualization! https://www.youtube.com/watch?v=Rwrp-Br97Ko&feature=emb_imp_woyt
+
+with current code, it takes about 1 second to do 100 pieces
+to simulate 1 trillion pieces, then, it would take about ten billion seconds, or 317 years!
+obviously, there has to be a way to speed things up...
+
+The reddit discussion seems to say: there's a deterministic pattern, you can use modulo to figure out what it is.
+https://www.reddit.com/r/adventofcode/comments/zq0ob1/2022_day_17_part_2_help_finding_the_phase_of/
+
+
+
+
+
+# [Day 16: Proboscidea Volcanium](https://adventofcode.com/2022/day/16)
+
+
+
+
+
+# [Day 15: Beacon Exclusion Zone](https://adventofcode.com/2022/day/15)
+
+
 # [Day 14: Regolith Reservoir](https://adventofcode.com/2022/day/14)
+
 
 Sand pours in grain-by-grain from point 500,0
 
@@ -10,476 +822,48 @@ sand movement rules:
 - falls down one step if possible
 - if tile below is blocked, falls diagonally down and to the left
 - if that tile is blocked, falls diagonally down and to the right
-- if all three possible destinations are blocked, sand comes to a rest and no longer moves
+- if all three possible dests are blocked, sand comes to a rest and no longer moves
 
 how many units of sand come to a rest, before sand falls into the abyss below? Part 2 seems to reference the idea there is no abyss at all....
 
 It seems like we need an efficient way to track a large matrix of values, e.g. 1000 x 500.
 
-```R
-
-rm(list = ls())
-
-library(dplyr)
-
-viz_map <- function(map, grain = NULL, cell_size = 0.5) {
-
-  sand_col <- "#f9c83d"
-  grain_col <- "#fbd955"
-  rock_col <- "#988317"
-
-  has_grain <- !is.null(grain)
-
-  rock_points <- which(map == "#", arr.ind = TRUE)
-  rocks <- data.frame(
-    x = rock_points[,2],
-    y = rock_points[,1],
-    type = "rock",
-    col = rock_col
-  )
-
-  has_sand <- any(map == "o")
-  if (has_sand) {
-    sand_points <- which(map == "o", arr.ind = TRUE)
-    sand <- data.frame(
-      x = sand_points[,2],
-      y = sand_points[,1],
-      type = "sand",
-      col = sand_col
-    )
-  }
-
-  par(bg = "black")
-  plot(NULL, xlim = c(500 - 50, 500 + 50), ylim = c(1, nrow(map)))
-  points(rocks, col = rock_col, pch = 15, cex = cell_size)
-  if (has_sand) points(sand, col = sand_col, pch = 15, cex = cell_size)
-  if (has_grain) points(grain, col = grain_col, pch = 15, cex = cell_size)
-
-}
+> "I realized that both part 1 and part 2 can be solved by memoizing the path of each previous grain of sand and then starting at the last position before it landed rather than at (500,0). This worked quite nicely and sped up my solution about 20x."
 
 
 
+# [Day 13: Distress Signal](https://adventofcode.com/2022/day/13)
 
-sim_grains <- function(path, viz = FALSE, overflow = FALSE) {
+Rules:
+- if both values are integers, compare the integers. 
+STOP IF the lower integer is on the left
+ERROR IF the lower integer is on the right
+- if both values are lists, compare the values inside each list.
+STOP IF the left list is shorter than the right list
+ERROR IF the right list is shorter than the left list
+- if exactly one value is an integer, convert to a list containing that integer
 
-  x <- readLines(path)
+Part II is tough - we have to use the 'compare' function to determine if any two are out of order and, if they are, reverse them. But what sorting algorithm can be used for this? Bubble sort?
 
-  # add rocks to the map
-  rocks <- data.frame(x = integer(), y = integer())
-  for (i in seq_along(x)) {
-    coords <- strsplit(x[i], split = " -> ")[[1]]
-    for (j in 1:(length(coords) - 1)) {
-      x_start <- as.integer(substr(coords[j], 1, regexpr(",", coords[j]) - 1)) + 1L
-      y_start <- as.integer(substr(coords[j], regexpr(",", coords[j]) + 1, nchar(coords[j]))) + 1L
-      x_stop <- as.integer(substr(coords[j + 1], 1, regexpr(",", coords[j + 1]) - 1)) + 1L
-      y_stop <- as.integer(substr(coords[j + 1], regexpr(",", coords[j + 1]) + 1, nchar(coords[j + 1]))) + 1L
-      if (y_start != y_stop & x_start == x_stop) {
-        add <- data.frame(x = x_start, y = y_start:y_stop)
-        rocks <- bind_rows(rocks, add)
-      } else if (y_start == y_stop & x_start != x_stop) {
-        add <- data.frame(x = x_start:x_stop, y = y_start)
-        rocks <- bind_rows(rocks, add)
-      } else {
-        stop("invalid coordinates")
-      }
-    }
-  }
+What does R use? In `sort` there is a `method` argument which has four options:
+- `quick`, Singleton (1969)'s implementation of Hoare's Quicksort method 
+- `radix`, no ref
+- `shell`, Shellsort (an O(n^{4/3}) variant from Sedgewick (1986)
+- `auto`, which selects `radix` for short (less than 2^31 elements) numeric vectors, otherwise `shell`
 
-  map_nrow <- max(rocks$y) + 2L
+Honestly I just need something I can code which is simple.
 
-  map <- matrix(".", nrow = map_nrow, ncol = 1300) # give a healthy width
-
-  # add a bottom line of bedrock
-  map[1,] <- "#"
-
-  # need to substract from nrow(map), so the map sees the top row as nrow(map) rather than 1
-  rocks$y <- map_nrow - rocks$y + 1L
-
-  for (i in 1:nrow(rocks)) map[rocks$y[i], rocks$x[i]] <- "#"
-
-  stopifnot(all(rocks$y > 0))
-  stopifnot(all(rocks$x > 0))
-
-  viz_map(map)
-
-  stop_condition <- FALSE
-
-  while (!stop_condition) {
-    grain <- data.frame(x = 501L, y = nrow(map))
-    if (map[nrow(map), 501L] == "o") stop_condition <- TRUE
-    while (!stop_condition & map[grain$y, grain$x] == ".") {
-      if (!overflow & grain$y == 2L) {
-        # only trigger if overflow set to FALSE
-        stop_condition <- TRUE
-      } else if (map[grain$y-1, grain$x] == ".") {
-        grain$y <- grain$y - 1
-      } else if (map[grain$y-1, grain$x-1] == ".") {
-        grain$y <- grain$y - 1
-        grain$x <- grain$x - 1
-      } else if (map[grain$y-1, grain$x+1] == ".") {
-        grain$y <- grain$y - 1
-        grain$x <- grain$x + 1
-      } else {
-        map[grain$y, grain$x] <- "o"
-      }
-      if (viz) {
-        viz_map(map, grain)
-        Sys.sleep(0.01)
-      }
-    }
-  }
-  viz_map(map, grain)
-  out <- sum(map == "o")
-  return(out)
-}
-
-sim_grains("day14/test_input.txt") == 24
-sim_grains("day14/input.txt") == 913
-
-sim_grains("day14/test_input.txt", overflow = TRUE) == 93
-sim_grains("day14/input.txt", overflow = TRUE) == 30762
-
-# I realized that both part 1 and part 2 can be solved by memoizing the path of each previous grain of sand and then starting at the last position before it landed rather than at (500,0). This worked quite nicely and sped up my solution about 20x.
-
-```
-
-
-
-# [Day 13](https://adventofcode.com/2022/day/13)
-
-(solution is in my other repo!)
 
 
 # [Day 12: Hill Climbing Algorithm](https://adventofcode.com/2022/day/12)
 
 a is lowest, b then up to z
 you can only go 1 letter up in elevation each step
-"the elevation of the destination square can be much lower than the elevation of your current square" implies that you can go more than 1 letter down tho...
+"the elevation of the dest square can be much lower than the elevation of your current square" implies that you can go more than 1 letter down tho...
 
 There's an S (the start) with elevantion a and an E (the goal) which has elevation z.
 
 The goal is to do it in as few steps as possible. Sounds like Djikstra! The cost of movement determines which adjacent cells are available.
-
-```R
-
-rm(list = ls())
-
-library(dplyr)
-
-vis_map <- function(path, highlight_lowest = FALSE) {
-
-  x <- readLines(path)
-
-  map <- matrix(NA, ncol = nchar(x[1]), nrow = length(x))
-
-  start_x <- NA
-  start_y <- NA
-  stop_x <- NA
-  stop_y <- NA
-
-  for (i in 1:length(x)) {
-    for (j in 1:nchar(x[1])) {
-      elevation <- substr(x[i], j, j)
-      if (elevation == "S") {
-        elevation <- "a"
-        start_x <- j
-        start_y <- i
-      }
-      if (elevation == "E") {
-        elevation <- "z"
-        stop_x <- j
-        stop_y <- i
-      }
-      map[i, j] <- match(elevation, letters)
-    }
-  }
-
-  colors <- terrain.colors(26)
-  if (highlight_lowest) colors[1] <- "#045200"
-
-  plot(NULL, xlim = c(1 - 0.5, ncol(map) + 0.5), ylim = c(1 - 0.5, nrow(map) + 0.5), frame.plot = FALSE, axes = FALSE, xlab = "", ylab = "")
-  for (i in 1:ncol(map)) {
-    for (j in 1:nrow(map)) {
-      rect(i - 0.5, j - 0.5, i + 0.5, j + 0.5, col = colors[map[j,i]], border = NA)
-    }
-  }
-  points(start_x, start_y, col = "red", pch = 15, cex = 3)
-  points(stop_x, stop_y, col = "red", pch = 1, cex = 3)
-
-}
-
-# this uses dijkstra's algorithm
-compute_shortest_path <- function(start, dest, edges, verbose = TRUE) {
-
-  n_nodes <- length(unique(edges$from))
-  nodes <- data.frame(
-    shortest_distance = rep(Inf, n_nodes),
-    best_neighbor = rep(NA, n_nodes),
-    visited = rep(FALSE, n_nodes)
-  )
-  nodes$shortest_distance[start] <- 0
-
-  # While there are interesting nodes unvisited from the starting node...
-  while (!all(nodes$visited) & any(!nodes$visited & nodes$shortest_distance < Inf)) {
-    # ...find the unvisited node with the current shortest distance from starting node...
-    focal <- which(!nodes$visited & nodes$shortest_distance == min(nodes$shortest_distance[which(!nodes$visited)]))[1]
-    nodes$visited[focal] <- TRUE
-    if (verbose) cat("Visiting node", focal, "with current shortest distance", nodes$shortest_distance[focal], "\n")
-    # ...and for every unvisited node connnected to this focal node...
-    neighbors <- edges$to[which(edges$from == focal & edges$to %in% which(!nodes$visited))]
-    for (neighbor in neighbors) {
-      # ...reroute through the focal if that's the shortest distance back to the start!
-      if (nodes$shortest_distance[focal] + edges$distance[which(edges$from == focal & edges$to == neighbor)] < nodes$shortest_distance[neighbor]) {
-        nodes$best_neighbor[neighbor] <- focal
-        nodes$shortest_distance[neighbor] <- nodes$shortest_distance[focal] + edges$distance[which(edges$from == focal & edges$to == neighbor)]
-        if (verbose) cat("Updating distance of node", neighbor, "to", nodes$shortest_distance[neighbor], "\n")
-      }
-      if (verbose) cat("Visited nodes:", which(nodes$visited), "\n")
-      if (verbose) cat("Current shortest distances:",nodes$shortest_distance, "\n")
-    }
-  }
-
-  shortest_path <- dest
-  while (!is.na(nodes$best_neighbor[shortest_path[length(shortest_path)]])) {
-    shortest_path <- c(shortest_path, nodes$best_neighbor[shortest_path[length(shortest_path)]])
-    shortest_path
-  }
-  out <- rev(shortest_path)
-  return(out)
-
-}
-
-
-analyze_advent_map_dijkstra <- function(path, viz = FALSE, verbose = FALSE, teleportation = FALSE) {
-
-  x <- readLines(path)
-
-  map <- matrix(NA, ncol = nchar(x[1]), nrow = length(x))
-  ind <- matrix(1:(nrow(map) * ncol(map)), nrow = nrow(map), ncol = ncol(map))
-
-  start_char <- "S"
-  stop_char <- "E"
-
-  for (i in 1:length(x)) {
-    for (j in 1:nchar(x[1])) {
-      elevation <- substr(x[i], j, j)
-      if (elevation == start_char) {
-        start_x <- j
-        start_y <- i
-      }
-      if (elevation == stop_char) {
-        stop_x <- j
-        stop_y <- i
-      }
-      if (elevation == "E") elevation <- "z"
-      if (elevation == "S") elevation <- "a"
-      map[i, j] <- match(elevation, letters)
-    }
-  }
-
-  start_i <- ind[start_y, start_x]
-  stop_i <- ind[stop_y, stop_x]
-
-  edges <- data.frame(from = integer(), to = integer(), distance = integer())
-  # build edge list
-  for (i in 1:nrow(map)) {
-    for (j in 1:ncol(map)) {
-      # check north of current cell
-      if (i > 1) {
-        if (map[(i - 1), j] <= (map[i, j] + 1)) {
-          add <- data.frame(from = ind[i, j], to = ind[i - 1, j], distance = 1L)
-          edges <- bind_rows(edges, add)
-        }
-      }
-      # check south of current cell
-      if (i < nrow(map)) {
-        if (map[(i + 1), j] <= (map[i, j] + 1)) {
-          add <- data.frame(from = ind[i, j], to = ind[i + 1, j], distance = 1L)
-          edges <- bind_rows(edges, add)
-        }
-      }
-      # check east of current cell
-      if (j > 1) {
-        if (map[i, (j - 1)] <= (map[i, j] + 1)) {
-          add <- data.frame(from = ind[i, j], to = ind[i, j - 1], distance = 1L)
-          edges <- bind_rows(edges, add)
-        }
-      }
-      # check west of current cell
-      if (j < ncol(map)) {
-        if (map[i, (j + 1)] <= (map[i, j] + 1)) {
-          add <- data.frame(from = ind[i, j], to = ind[i, j + 1], distance = 1L)
-          edges <- bind_rows(edges, add)
-        }
-      }
-    }
-  }
-
-  if (teleportation) {
-    # the second part is, what is the shortest path from ANY 'a' tile to the destination
-    # reddit hint: just connect the start tile to all other 'a' tiles, with a distance of 0!
-    other_a_tiles <- setdiff(ind[which(map == 1)], start_i)
-    new_links <- expand.grid(from = start_i, to = other_a_tiles, distance = 0)
-    edge_key <- paste(edges$from, edges$to)
-    new_key <- paste(new_links$from, new_links$to)
-    edges$distance[which(edge_key %in% new_key)] <- 0
-    keep <- which(!(new_key %in% edge_key))
-    if (length(keep) > 0) edges <- bind_rows(edges, new_links[keep,])
-  }
-
-  shortest_path <- compute_shortest_path(start_i, stop_i, edges, verbose)
-
-  if (teleportation) shortest_path <- shortest_path[-1]
-  # ignore the original start and use the first tile you 'teleported' to
-
-  if (viz) {
-    vis_map(path, highlight_lowest = TRUE)
-    route <- data.frame(x = rep(NA, length(shortest_path)), y = rep(NA, length(shortest_path)))
-    for (i in 1:length(shortest_path)) {
-      route$y[i] <- (shortest_path[i] - 1) %% nrow(ind) + 1
-      route$x[i] <- (shortest_path[i] - 1) %/% nrow(ind) + 1
-    }
-    points(route, type = "l", col = "black")
-    points(route$x[1], route$y[1], pch = 20, cex = 2)
-  }
-  out <- (length(shortest_path) - 1) # minus one because we count the number of 'moves', so don't count the starting tile
-  return(out)
-
-}
-
-analyze_advent_map <- function(path, viz = FALSE, verbose = FALSE, teleportation = FALSE) {
-
-  x <- readLines(path)
-
-  map <- matrix(NA, ncol = nchar(x[1]), nrow = length(x))
-  ind <- matrix(1:(nrow(map) * ncol(map)), nrow = nrow(map), ncol = ncol(map))
-
-  start_char <- "S"
-  stop_char <- "E"
-
-  for (i in 1:length(x)) {
-    for (j in 1:nchar(x[1])) {
-      elevation <- substr(x[i], j, j)
-      if (elevation == start_char) {
-        start_x <- j
-        start_y <- i
-      }
-      if (elevation == stop_char) {
-        stop_x <- j
-        stop_y <- i
-      }
-      if (elevation == "E") elevation <- "z"
-      if (elevation == "S") elevation <- "a"
-      map[i, j] <- match(elevation, letters)
-    }
-  }
-
-  start_i <- ind[start_y, start_x]
-  stop_i <- ind[stop_y, stop_x]
-
-  edges <- data.frame(from = integer(), to = integer(), distance = integer())
-  # build edge list
-  for (i in 1:nrow(map)) {
-    for (j in 1:ncol(map)) {
-      # check north of current cell
-      if (i > 1) {
-        if (map[(i - 1), j] <= (map[i, j] + 1)) {
-          add <- data.frame(from = ind[i, j], to = ind[i - 1, j], distance = 1L)
-          edges <- bind_rows(edges, add)
-        }
-      }
-      # check south of current cell
-      if (i < nrow(map)) {
-        if (map[(i + 1), j] <= (map[i, j] + 1)) {
-          add <- data.frame(from = ind[i, j], to = ind[i + 1, j], distance = 1L)
-          edges <- bind_rows(edges, add)
-        }
-      }
-      # check east of current cell
-      if (j > 1) {
-        if (map[i, (j - 1)] <= (map[i, j] + 1)) {
-          add <- data.frame(from = ind[i, j], to = ind[i, j - 1], distance = 1L)
-          edges <- bind_rows(edges, add)
-        }
-      }
-      # check west of current cell
-      if (j < ncol(map)) {
-        if (map[i, (j + 1)] <= (map[i, j] + 1)) {
-          add <- data.frame(from = ind[i, j], to = ind[i, j + 1], distance = 1L)
-          edges <- bind_rows(edges, add)
-        }
-      }
-    }
-  }
-
-  if (teleportation) {
-    # the second part is, what is the shortest path from ANY 'a' tile to the destination
-    # reddit hint: just connect the start tile to all other 'a' tiles, with a distance of 0!
-    other_a_tiles <- setdiff(ind[which(map == 1)], start_i)
-    new_links <- expand.grid(from = start_i, to = other_a_tiles, distance = 0)
-    edge_key <- paste(edges$from, edges$to)
-    new_key <- paste(new_links$from, new_links$to)
-    edges$distance[which(edge_key %in% new_key)] <- 0
-    keep <- which(!(new_key %in% edge_key))
-    if (length(keep) > 0) edges <- bind_rows(edges, new_links[keep,])
-  }
-
-  n_nodes <- length(unique(edges$from))
-  nodes <- data.frame(
-    visited = rep(FALSE, n_nodes),
-    first_neighbor = rep(NA, n_nodes)
-  )
-
-  # add unvisited neighbors of the current node to a queue
-  # process queue FIFO
-  # when you find the destination node, you are done!
-
-  queue <- start_i
-
-  while (length(queue) > 0 & !all(nodes$visited) & !(stop_i %in% which(nodes$visited))) {
-    focal <- queue[1]
-    nodes$visited[focal] <- TRUE
-    neighbors <- edges$to[which(edges$from == focal &
-      edges$to %in% which(!nodes$visited) & !(edges$to %in% queue))]
-    nodes$first_neighbor[neighbors] <- focal
-    queue <- c(queue, neighbors)
-    queue <- queue[-1]
-  }
-  
-  shortest_path <- stop_i
-  while (!is.na(nodes$first_neighbor[shortest_path[length(shortest_path)]])) {
-    shortest_path <- c(shortest_path, nodes$first_neighbor[shortest_path[length(shortest_path)]])
-    shortest_path
-  }
-  shortest_path <- rev(shortest_path)
-
-  if (teleportation) shortest_path <- shortest_path[-1]
-  # ignore the original start and use the first tile you 'teleported' to
-
-  if (viz) {
-    vis_map(path, highlight_lowest = TRUE)
-    route <- data.frame(x = rep(NA, length(shortest_path)), y = rep(NA, length(shortest_path)))
-    for (i in 1:length(shortest_path)) {
-      route$y[i] <- (shortest_path[i] - 1) %% nrow(ind) + 1
-      route$x[i] <- (shortest_path[i] - 1) %/% nrow(ind) + 1
-    }
-    points(route, type = "l", col = "black")
-    points(route$x[1], route$y[1], pch = 20, cex = 2)
-  }
-  out <- (length(shortest_path) - 1) # minus one because we count the number of 'moves', so don't count the starting tile
-  return(out)
-
-}
-
-analyze_advent_map("day12/test_input.txt") == 31
-analyze_advent_map("day12/input.txt") == 484 # 14.463 sec
-# analyze_advent_map_dijkstra("day12/input.txt") == 484 # 15.649 sec
-
-analyze_advent_map("day12/test_input.txt", teleportation = TRUE) == 29
-analyze_advent_map("day12/input.txt", teleportation = TRUE) == 478
-
-
-```
 
 In part 2, we have to find the shortest path across all the shortest paths from *every* elevation a. Reddit gave a great hint: just create new links between each of of the elevation 'a' tiles and the start with 0 distance, so they all effectively serve as logical starting places.
 
@@ -499,151 +883,7 @@ This could be a dirac dice situation? We shall see!
 
 We count the total number of times a monkey inspects an item over 20 rounds, and find the two most active monkeys.
 
-```R
-
-rm(list = ls())
-
-library(dplyr)
-
-
-
-##############
-
-update_worry <- function(worry, monkey, ops) {
-  ops[[monkey]](worry)
-}
-
-test_item <- function(worry, monkey, mod = test_modulos) {
-  worry %% mod[monkey] == 0
-}
-
-find_next_monkey <- function(current, test, links) {
-  links$next_monkey[which(links$current_monkey == current & links$test_condition == test)]
-}
-
-# identify next_monkey for each item this round
-
-simulate_transfers <- function(path, n_rounds = 20, use_modulo = TRUE) {
-
-  x <- readLines(path)
-
-  n_monkeys <- sum(grepl("Monkey \\d:", x))
-
-  # create items table
-  item_rows <- grep("  Starting items:", x)
-  items <- data.frame(worry = numeric(), current_monkey = numeric())
-  for (i in seq_along(item_rows)) {
-    worry_scores <- gsub(".*: ", "", x[item_rows[i]])
-    worry_scores <- as.numeric(strsplit(worry_scores, ", ")[[1]])
-    add <- data.frame(worry = worry_scores, current_monkey = i)
-    items <- bind_rows(items, add)
-  }
-  items$next_monkey <- NA
-
-  # create links table
-  links <- data.frame(current_monkey = numeric(), next_monkey = numeric(), test_condition = logical())
-  link_rows <- grep("    If true: throw to monkey", x)
-  for (i in seq_along(link_rows)) {
-    add <- data.frame(
-      current_monkey = i,
-      # dont forget we index monkeys from 1
-      next_monkey = as.numeric(gsub("\\D", "", x[link_rows[i]])) + 1,
-      test_condition = TRUE
-    )
-    links <- bind_rows(links, add)
-  }
-  link_rows <- grep("    If false: throw to monkey", x)
-  for (i in seq_along(link_rows)) {
-    add <- data.frame(
-      current_monkey = i,
-      # dont forget we index monkeys from 1
-      next_monkey = as.numeric(gsub("\\D", "", x[link_rows[i]])) + 1,
-      test_condition = FALSE
-    )
-    links <- bind_rows(links, add)
-  }
-  links <- arrange(links, links$current_monkey)
-
-  # extract test modulos
-  mod_rows <- grep("  Test: divisible by ", x)
-  test_modulos <- as.numeric(gsub("\\D", "", x[mod_rows]))
-
-  supermodulo <- prod(test_modulos)
-
-  # create operations list
-
-  op_rows <- grep("  Operation:", x)
-  if (use_modulo) {
-    op_code <- paste0(gsub("  Operation: new = ", "function(old) floor((", x[op_rows]), ") / 3)")
-  } else {
-    op_code <- paste0(gsub("  Operation: new = ", "function(old) floor(", x[op_rows]), ")")
-  }
-  inspection_ops <- vector("list", length(op_code))
-  for (i in seq_along(op_code)) inspection_ops[[i]] <- eval(parse(text = op_code[i]))
-
-
-  # begin transfer simulation!
-
-  counts <- data.frame(
-    round = integer(),
-    n_items = integer()
-  )
-
-  # loop over monkeys ("turns") then items within each monkey
-  for (round in seq_len(n_rounds)) {
-    for (m in seq_len(n_monkeys)) {
-      my_items <- which(items$current_monkey == m)
-      if (length(my_items) > 0) {
-        for (i in my_items) {
-          if (use_modulo) {
-            items$worry[i] <- update_worry(items$worry[i], m, inspection_ops)
-          } else {
-            items$worry[i] <- update_worry(items$worry[i] %% supermodulo, m, inspection_ops)
-          }
-          items$test[i] <- test_item(items$worry[i], m, test_modulos)
-          items$next_monkey[i] <- find_next_monkey(m, items$test[i], links)
-        }
-        # items immediately go to the next monkey
-        items$current_monkey[my_items] <- items$next_monkey[my_items]
-        items$next_monkey[my_items] <- NA
-      }
-      add <- data.frame(
-        round = round,
-        monkey = m,
-        n_items = length(my_items)
-      )
-      counts <- bind_rows(counts, add)
-    }
-    if (round %% 100 == 0) print(round)
-  }
-
-  counts |>
-    group_by(monkey) |>
-    summarize(
-      total_items = sum(n_items)
-    ) |> arrange(desc(total_items)) -> totals
-
-  out <- as.numeric(totals$total_items[1]) * as.numeric(totals$total_items[2])
-
-  return(out)
-
-}
-
-simulate_transfers("day11/test_input.txt", n_rounds = 20) == 10605
-
-simulate_transfers("day11/input.txt", n_rounds = 20) == 72884
-
-
-simulate_transfers("day11/test_input.txt", n_rounds = 10000, use_modulo = FALSE) == 2713310158
-
-simulate_transfers("day11/input.txt", n_rounds = 10000, use_modulo = FALSE) == 15310845153
-
-```
-
 Explanation of the supermodulo trick: https://www.reddit.com/r/adventofcode/comments/zih7gf/2022_day_11_part_2_what_does_it_mean_find_another/
-
-
-
 
 
 
@@ -654,164 +894,6 @@ great viz: https://www.reddit.com/r/adventofcode/comments/zhmsg2/2022_day_10_spr
 X starts at 1
 `addx V` takes two cycles to complete; after two cycles, add `V` to the X register
 `noop` takes one cycle to complete and has no effect
-
-```R
-
-library(dplyr)
-
-calc_signal_strength <- function(path) {
-
-  x <- readLines(path)
-  ops <- data.frame(
-    line = x
-  )
-
-  ops$cycles_used <- case_when(
-    grepl("noop", ops$line) ~ 0L,
-    grepl("addx", ops$line) ~ 1L
-  )
-
-  ops$delta_X <- NA
-  ops$delta_X[which(ops$line == "noop")] <- 0L
-  tar <- grep("addx", ops$line)
-  ops$delta_X[tar] <- as.integer(gsub("addx\\s", "", ops$line[tar]))
-
-  ops$cycle_starting <- NA
-  ops$cycle_ending <- NA
-
-  for (i in seq_len(nrow(ops))) {
-    if (i == 1) {
-      # initalization conditions
-      ops$cycle_starting[i] <- 1L
-    } else {
-      # each command begins on the cycle *after* the last command ends, so we add 1 here
-      ops$cycle_starting[i] <- ops$cycle_ending[i-1] + 1L
-    }
-    ops$cycle_ending[i] <- ops$cycle_starting[i] + ops$cycles_used[i]
-  }
-  
-  n_cycles <- ops$cycle_ending[nrow(ops)]
-
-  cycles <- data.frame(
-    cycle = seq_len(n_cycles),
-    X_starting = NA,
-    X_ending = NA
-  )
-
-  for (j in seq_len(nrow(cycles))) {
-    tar <- which(ops$cycle_ending == j)
-    if (length(tar) > 0) {
-      net_change <- ops$delta_X[tar]
-    } else {
-      net_change <- 0L
-    }
-    if (j == 1) {
-      # inital value of X is 1
-      cycles$X_starting[j] <- 1L
-    } else {
-      cycles$X_starting[j] <- cycles$X_ending[j-1]
-    }
-    cycles$X_ending[j] <- cycles$X_starting[j] + net_change
-  }
-
-  # interesting signal strengths found 'during the cycle' for target cycles
-  # 'during the cycle' means before the cycle ends, so X_starting
-  if (n_cycles >= 60) {
-    targets <- c(20, 20 + seq_len((n_cycles - 20) %/% 40) * 40)
-    out <- sum(targets * cycles$X_starting[targets])
-  } else {
-    out <- 0
-  }
-  return(out)
-}
-
-draw_screen <- function(path) {
-
-  x <- readLines(path)
-  ops <- data.frame(
-    line = x
-  )
-
-  ops$cycles_used <- case_when(
-    grepl("noop", ops$line) ~ 0L,
-    grepl("addx", ops$line) ~ 1L
-  )
-
-  ops$delta_X <- NA
-  ops$delta_X[which(ops$line == "noop")] <- 0L
-  tar <- grep("addx", ops$line)
-  ops$delta_X[tar] <- as.integer(gsub("addx\\s", "", ops$line[tar]))
-
-  ops$cycle_starting <- NA
-  ops$cycle_ending <- NA
-
-  for (i in seq_len(nrow(ops))) {
-    if (i == 1) {
-      # initalization conditions
-      ops$cycle_starting[i] <- 1L
-    } else {
-      # each command begins on the cycle *after* the last command ends, so we add 1 here
-      ops$cycle_starting[i] <- ops$cycle_ending[i-1] + 1L
-    }
-    ops$cycle_ending[i] <- ops$cycle_starting[i] + ops$cycles_used[i]
-  }
-  
-  n_cycles <- ops$cycle_ending[nrow(ops)]
-
-  cycles <- data.frame(
-    cycle = seq_len(n_cycles),
-    X_starting = NA,
-    X_ending = NA
-  )
-
-  for (j in seq_len(nrow(cycles))) {
-    tar <- which(ops$cycle_ending == j)
-    if (length(tar) > 0) {
-      net_change <- ops$delta_X[tar]
-    } else {
-      net_change <- 0L
-    }
-    if (j == 1) {
-      # inital value of X is 1
-      cycles$X_starting[j] <- 1L
-    } else {
-      cycles$X_starting[j] <- cycles$X_ending[j-1]
-    }
-    cycles$X_ending[j] <- cycles$X_starting[j] + net_change
-  }
-
-  cycles$draw_pixel <- (cycles$cycle - 1) %% 40
-  cycles$sprite_position <- cycles$X_starting
-  
-  cycles <- select(cycles, draw_pixel, sprite_position)
-
-  screen <- matrix(NA, ncol = 40, nrow = 6)
-
-  cycles$hit <- NA
-  for (i in 1:nrow(cycles)) {
-    if (cycles$draw_pixel[i] %in% (c(-1, 0, 1) + cycles$sprite_position[i])) {
-      cycles$hit[i] <- "#"
-    } else {
-      cycles$hit[i] <- "."
-    }
-  }
-
-  grid <- matrix(cycles$hit, byrow = TRUE, ncol = 40, nrow = 6)
-  out <- character()
-  for (i in 1:6) out[i] <- paste(grid[i,], collapse = "")
-  return(out)
-
-}
-
-calc_signal_strength("day10/test_input.txt") == 0
-calc_signal_strength("day10/test_input_ii.txt") == 13140
-calc_signal_strength("day10/input.txt") == 14420
-
-draw_screen("day10/test_input_ii.txt")
-draw_screen("day10/input.txt") # RGLRBZAU
-
-```
-
 
 
 
@@ -827,116 +909,7 @@ it looks like this uses [Chebyshev distance](https://en.wikipedia.org/wiki/Cheby
 
 look at this amazing viz: https://www.reddit.com/r/adventofcode/comments/zgq3nr/2022_day_9_rope_pull/
 
-```R
 
-# Cartesian distance
-dist <- function(focal, parent) {
-  sqrt((focal$x - parent$x)^2 + (focal$y - parent$y)^2)
-}
-
-update_node <- function(focal, parent) {
-  parent_dist <- dist(focal, parent)
-  if (parent_dist == 2) {
-    # parent cardinal 2 away
-    if (parent$x > focal$x & parent$y == focal$y) {
-      focal$x <- focal$x + 1L
-    } else if (parent$x < focal$x & parent$y == focal$y) {
-      focal$x <- focal$x - 1L
-    } else if (parent$y > focal$y & parent$x == focal$x) {
-      focal$y <- focal$y + 1L
-    } else if (parent$y < focal$y & parent$x == focal$x) {
-      focal$y <- focal$y - 1L
-    } else stop("should not happen 1")
-  } else if (parent_dist == sqrt(5)) {
-    # parent is a knight's move away
-    if ((parent$x - focal$x) > 1L) {
-      focal$x <- focal$x + 1L
-      focal$y <- parent$y
-    } else if ((parent$y - focal$y) > 1L) {
-      focal$y <- focal$y + 1L
-      focal$x <- parent$x
-    } else if ((parent$x - focal$x) < -1L) {
-      focal$x <- focal$x - 1L
-      focal$y <- parent$y
-    } else if ((parent$y - focal$y) < -1L) {
-      focal$y <- focal$y - 1L
-      focal$x <- parent$x
-    } else stop("should not happen 2")
-  } else if (parent_dist == sqrt(8)) {
-    # parent is two diagonals away
-    if (parent$y > focal$y) {
-      focal$y <- focal$y + 1L
-    } else {
-      focal$y <- focal$y - 1L
-    }
-    if (parent$x > focal$x) {
-      focal$x <- focal$x + 1L
-    } else {
-      focal$x <- focal$x - 1L
-    }
-  } else if (parent_dist < 2) {
-    # nothing!
-  } else stop ("should not happen")
-  return(focal)
-}
-
-prep_input <- function(x) {
-  out <- character(0)
-  for (i in seq_along(x)) {
-    move <- gsub("[^A-Z]", "", x[i])
-    n_times <- as.numeric(gsub("\\D", "", x[i]))
-    out <- c(out, rep(move, n_times))
-  }
-  return(out)
-}
-
-trace_tail <- function(path, rope_length = 2) {
-
-  x <- readLines(path)
-  commands <- prep_input(x)
-
-  rope <- data.frame(
-    x = rep(0L, rope_length),
-    y = rep(0L, rope_length)
-  )
-
-  tail <- data.frame(x = 0L, y = 0L)
-
-  for (j in seq_along(commands)) {
-    if (commands[j] == "R") {
-      rope$x[1] <- rope$x[1] + 1L
-    }
-    if (commands[j] == "L") {
-      rope$x[1] <- rope$x[1] - 1L
-    }
-    if (commands[j] == "U") {
-      rope$y[1] <- rope$y[1] + 1L
-    }
-    if (commands[j] == "D") {
-      rope$y[1] <- rope$y[1] - 1L
-    }
-    for (i in 2:rope_length) {
-      rope[i,] <- update_node(rope[i,], rope[(i-1),])
-    }
-    stopifnot(all(abs(diff(rope$x)) <= 1L))
-    stopifnot(all(abs(diff(rope$y)) <= 1L))
-    tail <- dplyr::bind_rows(tail, rope[rope_length,])
-  }
-
-  out <- nrow(unique(tail))
-  return(out)
-
-}
-
-trace_tail("day09/test_input.txt") == 13
-trace_tail("day09/test_input.txt", rope_length = 10) == 1
-
-trace_tail("day09/test_input_part2.txt", rope_length = 10) == 36
-
-trace_tail("day09/input.txt") == 5883
-trace_tail("day09/input.txt", rope_length = 10) == 2367
-
-```
 
 # [Day 8: Treetop Tree House](https://adventofcode.com/2022/day/8)
 
@@ -944,358 +917,27 @@ trace_tail("day09/input.txt", rope_length = 10) == 2367
 
 
 
-```R
-
-running_max <- function(x) c(-1, cummax(x[1:(length(x)-1)]))
-
-count_visible_trees <- function(path) {
-  x <- paste(readLines(path), collapse = "")
-  x <- as.numeric(strsplit(x, "")[[1]])
-  n_side <- sqrt(length(x))
-  dat <- matrix(x, ncol = n_side, byrow = TRUE)
-
-  max_east <- t(apply(dat, 1, running_max))
-  max_south <- apply(dat[nrow(dat):1,], 2, running_max)[nrow(dat):1,]
-  max_north <- apply(dat, 2, running_max)
-  max_west <- t(apply(t(dat)[nrow(dat):1,], 2, running_max)[nrow(dat):1,])
-
-  # lets count the hidden ones rather than the visible ones
-  n_hidden <- sum(dat <= max_east &
-    dat <= max_west &
-    dat <= max_north &
-    dat <= max_south)
-
-  n_visible <- n_side^2 - n_hidden
-  out <- n_visible
-  return(out)
-}
-
-calc_scenic_score <- function(x, y, dat) {
-  
-  n_side <- nrow(dat) 
-
-  if (y > 1) {
-    north_view <- dat[(y-1):1, x]
-    north_score <- min(c(which(north_view >= dat[y,x]), length(north_view)))
-  } else {
-    north_score <- 0
-  }
-
-  if (y < n_side) {
-    south_view <- dat[(y+1):n_side, x]
-    south_score <- min(c(which(south_view >= dat[y,x]), length(south_view)))
-  } else {
-    south_score <- 0
-  }
-
-  if (x > 1) {
-    east_view <- dat[y, (x-1):1]
-    east_score <- min(c(which(east_view >= dat[y,x]), length(east_view)))
-  } else {
-    east_score <- 0
-  }
-
-  if (x < n_side) {
-    west_view <- dat[y, (x+1):n_side]
-    west_score <- min(c(which(west_view >= dat[y,x]), length(west_view)))
-  } else {
-    west_score <- 0
-  }
-
-  out <- north_score * south_score * east_score * west_score
-  return(out)  
-
-}
-
-calc_max_scenic_score <- function(path) {
-  x <- paste(readLines(path), collapse = "")
-  x <- as.numeric(strsplit(x, "")[[1]])
-  n_side <- sqrt(length(x))
-  dat <- matrix(x, ncol = n_side, byrow = TRUE)
-  out <- matrix(NA, ncol = n_side, nrow = n_side)
-  for (i in seq_len(n_side)) {
-    for (j in seq_len(n_side)) {
-      out[i, j] <- calc_scenic_score(i, j, dat)
-    }
-    print(i)
-  }
-  return(max(out))
-}
-
-# part 1 
-count_visible_trees("day08/test_input.txt") == 21
-count_visible_trees("day08/input.txt") == 1705
-
-# part 2
-calc_max_scenic_score("day08/test_input.txt") == 8
-calc_max_scenic_score("day08/input.txt") == 371200
-
-```
-
-
 
 # [Day 7: No Space Left On Device](https://adventofcode.com/2022/day/7)
 
 [Reddit Solutions](https://www.reddit.com/r/adventofcode/comments/zesk40/2022_day_7_solutions/)
-
-```R
-
-clean_drive <- function(path, part_one = TRUE) {
-  x <- readLines(path)
-  # smol modifications to create a real bash script
-  x <- gsub("^dir", "mkdir", x)
-  x[grep("^\\d", x)] <- paste("fallocate -l", x[grep("^\\d", x)])
-  x <- gsub("\\$ ", "", x)
-  x <- x[-which(x == "ls")]
-  x[which(x == "cd /")] <- "cd _root"
-  writeLines(x, "temp.sh")
-
-  if (dir.exists("_root")) unlink("_root", recursive = TRUE)
-  dir.create("_root")
-  system("sh temp.sh")
-  file.remove("temp.sh")
-
-  files <- list.files("_root", full.names = TRUE, recursive = TRUE, include.dirs = TRUE)
-  dat <- file.info(files)
-  unlink("_root", recursive = TRUE)
-  dirs <- rownames(dat)[which(dat$isdir)]
-  dat <- dplyr::filter(dat, !dat$isdir)
-  dir_sizes <- rep(NA, length(dirs))
-  for (i in seq_along(dirs)) {
-    dir_sizes[i] <- sum(dat$size[grep(dirs[i], rownames(dat))])
-  } 
-  if (part_one == TRUE) {
-    out <- sum(dir_sizes[dir_sizes < 100000])
-  } else {
-    total <- sum(dat$size)
-    empty <- 70000000 - total
-    to_delete <- 30000000 - empty
-    out <- min(dir_sizes[dir_sizes > to_delete])
-  }
-  return(out)
-}
-
-
-clean_drive("day07/test_input.txt") == 95437
-clean_drive("day07/input.txt") == 1449447
-
-clean_drive("day07/test_input.txt", part_one = FALSE) == 24933642
-clean_drive("day07/input.txt", part_one = FALSE) == 8679207
-
-```
 
 
 # [Day 6: Tuning Trouble](https://adventofcode.com/2022/day/6)
 
 [Reddit Solutions](https://www.reddit.com/r/adventofcode/comments/zdw0u6/2022_day_6_solutions/)
 
-```r
-
-find_packet_start <- function(path, chunk_length = 4) {
-  x <- readLines(path)
-  n_chunks <- nchar(x) - (chunk_length - 1)
-  dat <- matrix(NA, ncol = chunk_length, nrow = n_chunks)
-  for (i in seq_len(nrow(dat))) {
-    dat[i,] <- strsplit(substr(x, i, i + (chunk_length - 1)), "")[[1]]
-  }
-  chunk_is_unique <- apply(dat, 1, function(z) !any(duplicated(z)))
-  out <- (chunk_length - 1) + min(which(chunk_is_unique))
-  return(out)
-}
-
-find_packet_start("day06/test_input_1.txt") == 7
-find_packet_start("day06/test_input_2.txt") == 5
-find_packet_start("day06/test_input_3.txt") == 6
-find_packet_start("day06/test_input_4.txt") == 10
-find_packet_start("day06/test_input_5.txt") == 11
-find_packet_start("day06/input.txt") == 1361
-
-find_packet_start("day06/test_input_1.txt", chunk_length = 14) == 19
-find_packet_start("day06/test_input_2.txt", chunk_length = 14) == 23
-find_packet_start("day06/test_input_3.txt", chunk_length = 14) == 23
-find_packet_start("day06/test_input_4.txt", chunk_length = 14) == 29
-find_packet_start("day06/test_input_5.txt", chunk_length = 14) == 26
-
-find_packet_start("day06/input.txt", chunk_length = 14) == 3263
-
-
-
-```
-
 
 # [Day 5: Supply Stacks](https://adventofcode.com/2022/day/5)
 
 
-```r
-
-number_scraper <- function(pattern, x) {
-  m <- regexpr(pattern, x, perl = TRUE)
-  as.numeric(regmatches(x, m))
-}
-
-find_top_crates <- function(path, move_type = "one at a time") {
-
-  x <- readLines(path)
-
-  map_bottom <- which(x == "")
-  map <- x[1:(map_bottom-2)]
-  columns <- nchar(x[1])
-
-  inst <- data.frame(
-    text = x[(map_bottom+1):length(x)]
-  )
-
-  inst$source <- number_scraper("(?<=from )\\d+", inst$text)
-  inst$dest <- number_scraper("(?<=to )\\d+", inst$text)
-  inst$n_moves <- number_scraper("(?<=^move )\\d+", inst$text)
-
-  n_cols <- nchar(map[1]) %/% 3
-
-  stacks <- vector("list", n_cols)
-  for (i in length(map):1) {
-    for (j in 1:n_cols) {
-      addy_j <- 4 * (j-1) + 2
-      box <- substr(map[i], addy_j, addy_j)
-      if (box != " ") {
-        stacks[[j]] <- c(stacks[[j]], box)
-      }
-    }
-  }
-
-  for (i in seq_len(nrow(inst))) {
-    if (move_type == "one at a time") {
-      for (j in seq_len(inst$n_moves[i])) {
-        col_len <- length(stacks[[inst$source[i]]])
-        stopifnot(col_len > 0)
-        stacks[[inst$dest[i]]] <- c(stacks[[inst$dest[i]]], stacks[[inst$source[i]]][col_len])
-        stacks[[inst$source[i]]] <- stacks[[inst$source[i]]][-col_len]
-      }
-    } else if (move_type == "multiple at once") {
-      col_len <- length(stacks[[inst$source[i]]])
-      stopifnot(col_len > 0)
-      targets <- (col_len - inst$n_moves[i] + 1):col_len
-      stacks[[inst$dest[i]]] <- c(stacks[[inst$dest[i]]], stacks[[inst$source[i]]][targets])
-        stacks[[inst$source[i]]] <- stacks[[inst$source[i]]][-targets]
-
-    } else stop("invalid move_type")
-  }
-
-  top_box <- rep(NA, n_cols)
-  for (i in seq_len(n_cols)) {
-    top_box[i] <- stacks[[i]][length(stacks[[i]])]
-  }
-  out <- paste(top_box, collapse = "")
-  return(out)
-}
-
-find_top_crates("day05/test_input.txt") == "CMZ"
-find_top_crates("day05/input.txt") == "CWMTGHBDW"
-
-find_top_crates("day05/test_input.txt", move_type = "multiple at once") == "MCD"
-find_top_crates("day05/input.txt", move_type = "multiple at once") == "SSCGWJCRB"
-
-```
-
 
 # [Day 4: Camp Cleanup](https://adventofcode.com/2022/day/4)
 
-```r
-
-number_scraper <- function(pattern, x) {
-  m <- regexpr(pattern, x, perl = TRUE)
-  as.numeric(regmatches(x, m))
-}
-
-count_overlaps <- function(path, type = "subsets") {
-  x <- readLines(path)
-  A_start <- number_scraper("^\\d+", x)
-  A_stop <- number_scraper("\\d+(?=\\,)", x)
-  B_start <- number_scraper("(?<=,)\\d+", x)
-  B_stop <- number_scraper("\\d+$", x)
-  if (type == "subsets") {
-    out <- sum(
-      A_start <= B_start & A_stop >= B_stop |
-      B_start <= A_start & B_stop >= A_stop)
-  } else if (type == "all") {
-    n_non_overlaps <- sum(
-      B_start > A_stop |
-      B_stop < A_start
-    )
-    # so overlaps are everything else
-    out <- length(A_start) - n_non_overlaps
-  } else {
-    stop("invalid type argument")
-  }
-  return(out)
-}
-
-count_overlaps("day04/test_input.txt") == 2
-count_overlaps("day04/input.txt") == 542
-
-count_overlaps("day04/test_input.txt", type = "all") == 4
-count_overlaps("day04/input.txt", type = "all") == 900
-
-```
 
 
 # [Day 3: Rucksack Reorganization](https://adventofcode.com/2022/day/3)
 
-```r
-
-rm(list = ls())
-
-inventory_rucksack <- function(pack_string) {
-  data.frame(
-    part = c(rep(1, nchar(pack_string)/2), rep(2, nchar(pack_string)/2)),
-    item = strsplit(pack_string, "")[[1]]
-  ) |>
-  group_by(part) |>
-  count(item) |> as.data.frame() |>
-  mutate(priority = match(item, c(letters, LETTERS))) -> inv
-  inv$in_both_parts <- inv$item %in% intersect(inv$item[inv$part == 1], inv$item[inv$part == 2])
-  return(inv)
-}
-
-calc_rucksack_priorities <- function(path, scenario = "misplaced") {
-  packs <- data.frame(
-    contents = readLines(path),
-    priority = NA
-  )
-  if (scenario == "misplaced") {
-    for (i in seq_len(nrow(packs))) {
-      inv <- inventory_rucksack(packs$contents[i])
-      packs$priority[i] <- inv$priority[which(inv$in_both_parts)][1]
-    }
-    out <- sum(packs$priority)
-  } else if (scenario == "grouping") {
-    n_groups <- nrow(packs) %/% 3
-    packs$group <- rep(seq_len(n_groups), each = 3)
-    for (i in seq_len(n_groups)) {
-      for (j in 1:3) {
-        add <- inventory_rucksack(packs$contents[which(packs$group == i)[j]])
-        add$member <- j
-        if (j == 1) {
-          inv <- add
-        } else {
-          inv <- bind_rows(inv, add)
-        }
-      }
-      inv$in_all_members <- inv$item %in% intersect(intersect(inv$item[which(inv$member == 1)], inv$item[which(inv$member == 2)]), inv$item[which(inv$member == 3)])
-      packs$priority[which(packs$group == i)] <- inv$priority[which(inv$in_all_members)][1]
-    }
-    elf_groups <- packs |> group_by(group) |> summarize(priority = first(priority)) 
-    out <- sum(elf_groups$priority)
-  }
-  return(out)
-}
-
-calc_rucksack_priorities("day03/test_input.txt") == 157
-calc_rucksack_priorities("day03/input.txt") == 7597
-
-calc_rucksack_priorities("day03/test_input.txt", scenario = "grouping") == 70
-calc_rucksack_priorities("day03/input.txt", scenario = "grouping") == 2607
-
-```
 
 
 
@@ -1325,101 +967,7 @@ Z = win
 
 Together with the first letter, this implies the choice of move that you should make, e.g. A X means you pick scissors.
 
-```r
-
-calc_score <- function(path, buggy = TRUE) {
-
-  x <- readLines(path)
-
-  if (buggy) {
-
-    shape_score <- case_when(
-      grepl("X", x) ~ 1,
-      grepl("Y", x) ~ 2,
-      grepl("Z", x) ~ 3,
-    )
-
-    wins <- c("A Y", "B Z", "C X")
-    draws <- c("A X", "B Y", "C Z")
-    loses <- c("A Z", "B X", "C Y")
-
-    outcome_score <- case_when(
-      x %in% wins ~ 6,
-      x %in% draws ~ 3,
-      x %in% loses ~ 0
-    )
-
-  } else {
-
-    outcome_score <- case_when(
-      grepl("X", x) ~ 0,
-      grepl("Y", x) ~ 3,
-      grepl("Z", x) ~ 6,
-    )
-
-    rock <- c("B X", "A Y", "C Z")
-    paper <- c("C X", "B Y", "A Z")
-    scissors <- c("A X", "C Y", "B Z")
-
-    shape_score <- case_when(
-      x %in% rock ~ 1,
-      x %in% paper ~ 2,
-      x %in% scissors ~ 3
-    )
-
-  }
-
-  return(sum(shape_score + outcome_score))
-
-}
-
-calc_score("day02/test_input.txt") == 15
-calc_score("day02/input.txt") == 8392
-
-calc_score("day02/test_input.txt", buggy = FALSE) == 12
-calc_score("day02/input.txt", buggy = FALSE) == 10116
-
-```
-
 
 
 
 # [Day 1: Calorie Counting](https://adventofcode.com/2022/day/1)
-
-```r
-
-rm(list = ls())
-
-library(dplyr)
-
-count_calories <- function(path, n_elves = 1) {
-  x <- readLines(path)
-  x <- as.numeric(x)
-  breaks <- which(is.na(x))
-  starts <- c(1, breaks+1)
-  stops <- c(breaks-1, length(x))
-
-  for (i in seq_along(starts)) {
-    add <- data.frame(
-      elf = i,
-      calories = x[starts[i]:stops[i]]
-    )
-    if (i == 1) {
-      dat <- add
-    } else {
-      dat <- bind_rows(dat, add)
-    }
-  }
-
-  dat |> group_by(elf) |> summarize(total_calories = sum(calories)) |> as.data.frame() |> arrange(desc(total_calories)) -> elves
-
-  return(sum(elves$total_calories[1:n_elves]))
-}
-
-count_calories("day01/test_input.txt") == 24000
-count_calories("day01/input.txt") == 67633
-
-count_calories("day01/test_input.txt", n_elves = 3) == 45000
-count_calories("day01/input.txt", n_elves = 3) == 199628
-
-```
